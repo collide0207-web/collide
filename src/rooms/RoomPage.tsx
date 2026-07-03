@@ -1,33 +1,34 @@
-import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
-import { CodeEditor } from '../editor/CodeEditor'
+import { useEffect, useRef, useState } from 'react'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { EditorColumn } from '../editor/EditorColumn'
 import { Whiteboard } from '../board/Whiteboard'
-import { ShareDialog } from './ShareDialog'
-import { BottomPanel } from '../run/BottomPanel'
-import { VideoPanel } from '../video/VideoPanel'
-import { runCode, type RunResult } from '../run/runner'
-import { getRoomDoc, setPresence } from '../collab/yjs'
-import { useSession } from '../store/session'
-import type { Role } from '../api/types'
+import { ParticipantsStrip } from '../video/ParticipantsStrip'
+import { SplitPane } from '../layout/SplitPane'
+import { ScreenIcon } from '../video/icons'
+import { setPresence } from '../collab/yjs'
+import { useSession, type StudyMode } from '../store/session'
 
-const COLORS = ['#0a84ff', '#ff375f', '#30d158', '#ffd60a', '#bf5af2']
+const COLORS = ['#5b8cff', '#ff6b8b', '#3dd68c', '#ffcf5c', '#c084fc']
+const LAYOUT_KEY = 'collide-layout'
+type Layout = 'editor-left' | 'editor-right'
 
 export function RoomPage() {
   const { roomId = 'demo' } = useParams()
+  const [search] = useSearchParams()
+  const navigate = useNavigate()
+
   const user = useSession((s) => s.user)
-  const role = useSession((s) => s.simulatedRole)
-  const setRole = useSession((s) => s.setSimulatedRole)
+  const sessionMode = useSession((s) => s.mode)
+  const logout = useSession((s) => s.logout)
 
-  const [shareOpen, setShareOpen] = useState(false)
-  const [videoOpen, setVideoOpen] = useState(false)
-  const [running, setRunning] = useState(false)
-  const [result, setResult] = useState<RunResult | null>(null)
+  const mode: StudyMode = (search.get('mode') as StudyMode) || sessionMode
+  const isGroup = mode === 'group'
 
-  // Role hint from a share link (?role=viewer) for quick testing.
-  useEffect(() => {
-    const p = new URLSearchParams(location.search).get('role') as Role | null
-    if (p === 'editor' || p === 'viewer' || p === 'owner') setRole(p)
-  }, [setRole])
+  const [layout, setLayout] = useState<Layout>(
+    () => (localStorage.getItem(LAYOUT_KEY) as Layout) || 'editor-left',
+  )
+  const [screenStream, setScreenStream] = useState<MediaStream | null>(null)
+  const screenRef = useRef<MediaStream | null>(null)
 
   useEffect(() => {
     const name = user?.name || 'Guest'
@@ -35,59 +36,86 @@ export function RoomPage() {
     setPresence(roomId, { name, color })
   }, [roomId, user])
 
-  const canEdit = role === 'owner' || role === 'editor'
+  // In group mode the current user is the host and can always edit.
+  const canEdit = true
+  const isHost = isGroup
 
-  async function onRun() {
-    if (!canEdit) return
-    setRunning(true)
-    const source = getRoomDoc(roomId).doc.getText('monaco').toString()
-    const res = await runCode(source)
-    setResult(res)
-    setRunning(false)
+  function toggleLayout() {
+    setLayout((l) => {
+      const next = l === 'editor-left' ? 'editor-right' : 'editor-left'
+      localStorage.setItem(LAYOUT_KEY, next)
+      return next
+    })
   }
+
+  async function toggleScreenShare() {
+    if (screenRef.current) {
+      screenRef.current.getTracks().forEach((t) => t.stop())
+      screenRef.current = null
+      setScreenStream(null)
+      return
+    }
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true })
+      stream.getVideoTracks()[0]?.addEventListener('ended', () => {
+        screenRef.current = null
+        setScreenStream(null)
+      })
+      screenRef.current = stream
+      setScreenStream(stream)
+    } catch {
+      /* user cancelled the picker */
+    }
+  }
+
+  function doLogout() {
+    screenRef.current?.getTracks().forEach((t) => t.stop())
+    logout()
+    navigate('/login')
+  }
+
+  const editorEl = <EditorColumn roomId={roomId} canEdit={canEdit} />
+  const boardEl = (
+    <div className="board-pane">
+      <span className="pane-label">NOTES</span>
+      <Whiteboard roomId={roomId} readOnly={!canEdit} />
+    </div>
+  )
 
   return (
     <div className="room">
       <div className="topbar">
-        <span className="title">Collide</span>
-        <span className={`badge ${role}`}>{role}</span>
+        <span className="title"><span className="brand-logo">◆</span> Collide</span>
+        <span className={`mode-chip ${mode}`}>{isGroup ? 'Group session' : 'Self study'}</span>
         <span className="spacer" />
 
-        <button onClick={onRun} disabled={!canEdit || running}>
-          {running ? 'Running…' : '▶ Run'}
-        </button>
-        <button className="secondary" onClick={() => setVideoOpen((v) => !v)}>
-          {videoOpen ? 'Hide call' : 'Call'}
+        <button className="btn-ghost" onClick={toggleLayout} title="Swap editor / notes sides">
+          ⇄ {layout === 'editor-left' ? 'Editor left' : 'Editor right'}
         </button>
 
-        <label style={{ fontSize: 12, color: '#666' }}>simulate role:</label>
-        <select value={role} onChange={(e) => setRole(e.target.value as Role)}>
-          <option value="owner">owner</option>
-          <option value="editor">editor</option>
-          <option value="viewer">viewer</option>
-        </select>
+        {isGroup && (
+          <button className={`btn-ghost ${screenStream ? 'active' : ''}`} onClick={toggleScreenShare}>
+            <ScreenIcon /> {screenStream ? 'Stop share' : 'Share screen'}
+          </button>
+        )}
 
-        {role === 'owner' && <button onClick={() => setShareOpen(true)}>Share</button>}
+        <button className="btn-danger" onClick={doLogout}>Log out</button>
       </div>
 
       <div className="workspace">
-        <div className="editor-col">
-          <div className="pane">
-            <CodeEditor roomId={roomId} readOnly={!canEdit} />
-            {!canEdit && <div className="readonly-banner">Read-only (viewer)</div>}
-          </div>
-          <BottomPanel result={result} running={running} />
-        </div>
-
-        <div className="pane">
-          <span className="pane-label">BOARD</span>
-          <Whiteboard roomId={roomId} readOnly={!canEdit} />
-        </div>
-
-        {videoOpen && <VideoPanel onClose={() => setVideoOpen(false)} />}
+        <SplitPane
+          storageKey="collide-split"
+          a={layout === 'editor-left' ? editorEl : boardEl}
+          b={layout === 'editor-left' ? boardEl : editorEl}
+        />
+        {isGroup && (
+          <ParticipantsStrip
+            selfName={user?.name || 'You'}
+            isHost={isHost}
+            screenStream={screenStream}
+          />
+        )}
       </div>
-
-      {shareOpen && <ShareDialog roomId={roomId} onClose={() => setShareOpen(false)} />}
     </div>
   )
 }

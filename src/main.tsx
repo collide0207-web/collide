@@ -2,12 +2,14 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom'
 import { LoginPage } from './auth/LoginPage'
+import { ModeSelect } from './rooms/ModeSelect'
 import { RoomPage } from './rooms/RoomPage'
 import './index.css'
 
 const router = createBrowserRouter([
   { path: '/', element: <Navigate to="/login" replace /> },
   { path: '/login', element: <LoginPage /> },
+  { path: '/home', element: <ModeSelect /> },
   { path: '/room/:roomId', element: <RoomPage /> },
 ])
 

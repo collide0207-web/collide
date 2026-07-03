@@ -1,7 +1,10 @@
 import { useEffect } from 'react'
-import { Tldraw } from 'tldraw'
+import { Tldraw, TLComponents } from 'tldraw'
 import 'tldraw/tldraw.css'
 import { focusBoard, registerBoard } from './boardFocus'
+
+// Hide the multi-page UI — notes are a single infinite, scrollable canvas.
+const components: TLComponents = { PageMenu: null }
 
 interface Props {
   roomId: string
@@ -28,6 +31,7 @@ export function Whiteboard({ roomId, readOnly }: Props) {
     >
       <Tldraw
         autoFocus={false}
+        components={components}
         // Disable tldraw's number-key → toolbar-tool shortcuts. Those are bound on a
         // global keydown listener that does NOT respect the isFocused flag, so digits
         // typed in the code editor were leaking to the board. We don't need them.

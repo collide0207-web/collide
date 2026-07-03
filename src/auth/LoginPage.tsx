@@ -6,34 +6,43 @@ import { useSession } from '../store/session'
 export function LoginPage() {
   const navigate = useNavigate()
   const setSession = useSession((s) => s.setSession)
-  const [name, setName] = useState('You')
-  const [email, setEmail] = useState('you@example.com')
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
   const [busy, setBusy] = useState(false)
 
   async function start() {
+    if (!name.trim()) return
     setBusy(true)
-    const { user, token } = await api.login(email, name)
+    const { user, token } = await api.login(email || 'you@example.com', name)
     setSession(user, token)
-    const room = await api.createRoom('My First Room')
-    navigate(`/room/${room.id}`)
+    navigate('/home')
   }
 
   return (
-    <div className="login">
-      <div className="login-card">
-        <h1>Collide</h1>
-        <p>Mock login — frontend-first scaffold. No backend required yet.</p>
+    <div className="auth-wrap">
+      <div className="auth-aside">
+        <div className="brand">
+          <span className="brand-logo">◆</span> Collide
+        </div>
+        <h2>Code together.<br />Think together.</h2>
+        <p>A shared editor and an infinite notes canvas — for solo focus or live sessions with your team.</p>
+      </div>
+
+      <div className="auth-card">
+        <h1>Welcome</h1>
+        <p className="muted">Sign in to start a session.</p>
         <div className="field">
           <label>Name</label>
-          <input value={name} onChange={(e) => setName(e.target.value)} />
+          <input value={name} placeholder="Your name" onChange={(e) => setName(e.target.value)} />
         </div>
         <div className="field">
-          <label>Email</label>
-          <input value={email} onChange={(e) => setEmail(e.target.value)} />
+          <label>Email <span className="muted">(optional)</span></label>
+          <input value={email} placeholder="you@example.com" onChange={(e) => setEmail(e.target.value)} />
         </div>
-        <button disabled={busy} onClick={start}>
-          {busy ? 'Starting…' : 'Sign in & create a room'}
+        <button className="btn-accent full" disabled={busy || !name.trim()} onClick={start}>
+          {busy ? 'Signing in…' : 'Continue'}
         </button>
+        <p className="fineprint">Mock login — no backend required yet.</p>
       </div>
     </div>
   )
