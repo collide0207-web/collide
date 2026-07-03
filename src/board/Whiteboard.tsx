@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Tldraw, TLComponents, type Editor } from 'tldraw'
 import 'tldraw/tldraw.css'
 import { focusBoard, registerBoard } from './boardFocus'
+import { bindTldrawToYjs } from './tldrawYjs'
+import { getRoomDoc } from '../collab/yjs'
 
 // Hide the multi-page UI — notes are a single infinite, pannable canvas.
 const components: TLComponents = { PageMenu: null }
@@ -27,8 +29,15 @@ export function Whiteboard({ roomId, readOnly }: Props) {
   const [theme, setTheme] = useState<NoteTheme>(
     () => (localStorage.getItem(THEME_KEY) as NoteTheme) || 'light',
   )
+  const unbindRef = useRef<(() => void) | null>(null)
 
-  useEffect(() => () => registerBoard(null), [])
+  useEffect(
+    () => () => {
+      unbindRef.current?.()
+      registerBoard(null)
+    },
+    [],
+  )
 
   // Apply the color scheme whenever it changes or the editor mounts.
   useEffect(() => {
@@ -60,12 +69,13 @@ export function Whiteboard({ roomId, readOnly }: Props) {
         // global keydown listener that ignores the focus flag, so digits typed in the
         // code editor were leaking to the board. We don't need them.
         options={{ enableToolbarKeyboardShortcuts: false }}
-        persistenceKey={`collab-ide-board-${roomId}`}
         onMount={(ed) => {
           ed.updateInstanceState({ isReadonly: readOnly, isFocused: false })
           ed.user.updateUserPreferences({ colorScheme: theme })
           registerBoard(ed)
           setEditor(ed)
+          // Bind the board to the room's shared Yjs doc → live collaboration.
+          unbindRef.current = bindTldrawToYjs(ed, getRoomDoc(roomId).doc)
         }}
       />
     </div>
