@@ -1,10 +1,13 @@
-import { useEffect } from 'react'
-import { Tldraw, TLComponents } from 'tldraw'
+import { useEffect, useState } from 'react'
+import { Tldraw, TLComponents, type Editor } from 'tldraw'
 import 'tldraw/tldraw.css'
 import { focusBoard, registerBoard } from './boardFocus'
 
-// Hide the multi-page UI — notes are a single infinite, scrollable canvas.
+// Hide the multi-page UI — notes are a single infinite, pannable canvas.
 const components: TLComponents = { PageMenu: null }
+
+type NoteTheme = 'light' | 'dark'
+const THEME_KEY = 'collide-notes-theme'
 
 interface Props {
   roomId: string
@@ -14,32 +17,55 @@ interface Props {
 /**
  * Whiteboard surface.
  *
- * autoFocus={false} stops tldraw from grabbing keyboard focus on mount. We only
- * focus it when the user actually points at the board, so shortcuts can't leak in
- * while someone is typing code. See boardFocus.ts.
- *
- * For now tldraw persists locally per room (persistenceKey). Real-time board collab
- * (binding tldraw's store to the shared Y.Doc) is the next step.
+ * - autoFocus={false} + focusBoard() on pointer down keeps keyboard shortcuts from
+ *   leaking between the code editor and the board.
+ * - Infinite canvas: pan with mouse wheel / trackpad, zoom with Ctrl/Cmd + wheel.
+ * - Light/Dark theme toggle (top-right) drives tldraw's colorScheme.
  */
 export function Whiteboard({ roomId, readOnly }: Props) {
+  const [editor, setEditor] = useState<Editor | null>(null)
+  const [theme, setTheme] = useState<NoteTheme>(
+    () => (localStorage.getItem(THEME_KEY) as NoteTheme) || 'light',
+  )
+
   useEffect(() => () => registerBoard(null), [])
 
+  // Apply the color scheme whenever it changes or the editor mounts.
+  useEffect(() => {
+    if (editor) editor.user.updateUserPreferences({ colorScheme: theme })
+  }, [editor, theme])
+
+  function toggleTheme() {
+    setTheme((t) => {
+      const next = t === 'light' ? 'dark' : 'light'
+      localStorage.setItem(THEME_KEY, next)
+      return next
+    })
+  }
+
   return (
-    <div
-      style={{ position: 'absolute', inset: 0 }}
-      onPointerDown={() => focusBoard()}
-    >
+    <div style={{ position: 'absolute', inset: 0 }} onPointerDown={() => focusBoard()}>
+      <button
+        className="notes-theme-btn"
+        onClick={toggleTheme}
+        title={theme === 'light' ? 'Switch notes to dark' : 'Switch notes to light'}
+      >
+        {theme === 'light' ? '🌙' : '☀️'}
+      </button>
+
       <Tldraw
         autoFocus={false}
         components={components}
-        // Disable tldraw's number-key → toolbar-tool shortcuts. Those are bound on a
-        // global keydown listener that does NOT respect the isFocused flag, so digits
-        // typed in the code editor were leaking to the board. We don't need them.
+        // Disable tldraw's number-key → toolbar-tool shortcuts. They're bound on a
+        // global keydown listener that ignores the focus flag, so digits typed in the
+        // code editor were leaking to the board. We don't need them.
         options={{ enableToolbarKeyboardShortcuts: false }}
         persistenceKey={`collab-ide-board-${roomId}`}
-        onMount={(editor) => {
-          editor.updateInstanceState({ isReadonly: readOnly, isFocused: false })
-          registerBoard(editor)
+        onMount={(ed) => {
+          ed.updateInstanceState({ isReadonly: readOnly, isFocused: false })
+          ed.user.updateUserPreferences({ colorScheme: theme })
+          registerBoard(ed)
+          setEditor(ed)
         }}
       />
     </div>
