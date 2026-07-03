@@ -233,6 +233,32 @@ input:focus, select:focus { border-color: var(--accent); }
   background: var(--surface-3); border-radius: 8px;
 }
 
+/* ---------- Add-members dialog ---------- */
+.btn-ghost.icon-only { padding: 7px 9px; }
+.overlay {
+  position: fixed; inset: 0; background: rgba(4, 6, 10, 0.6);
+  display: flex; align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(3px);
+}
+.dialog {
+  width: 460px; max-width: calc(100vw - 32px); background: var(--surface);
+  border: 1px solid var(--border); border-radius: 16px; padding: 22px; box-shadow: var(--shadow);
+}
+.dialog-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.dialog-head h3 { margin: 0; font-size: 18px; }
+.icon-x { background: transparent; color: var(--muted); font-size: 15px; padding: 4px 8px; border-radius: 8px; }
+.icon-x:hover { background: var(--surface-3); color: var(--text); }
+.invite-block { margin: 14px 0; }
+.block-label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+.invite-row { display: flex; gap: 8px; margin-bottom: 8px; }
+.invite-row input { flex: 1; min-width: 0; }
+.invite-row select { flex: 0 0 auto; }
+.invited-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.invited-chip { font-size: 12px; background: rgba(61, 214, 140, 0.14); color: var(--ok); padding: 3px 9px; border-radius: 999px; }
+.or-divider { display: flex; align-items: center; text-align: center; color: var(--muted); font-size: 12px; margin: 8px 0; }
+.or-divider::before, .or-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.or-divider span { padding: 0 12px; }
+.fineprint.left { text-align: left; margin-top: 8px; }
+
 @media (max-width: 760px) {
   .auth-wrap { grid-template-columns: 1fr; }
   .auth-aside { display: none; }

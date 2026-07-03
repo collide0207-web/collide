@@ -4,7 +4,8 @@ import { EditorColumn } from '../editor/EditorColumn'
 import { Whiteboard } from '../board/Whiteboard'
 import { ParticipantsStrip } from '../video/ParticipantsStrip'
 import { SplitPane } from '../layout/SplitPane'
-import { ScreenIcon } from '../video/icons'
+import { ScreenIcon, AddPersonIcon } from '../video/icons'
+import { AddMembersDialog } from './AddMembersDialog'
 import { setPresence } from '../collab/yjs'
 import { useSession, type StudyMode } from '../store/session'
 
@@ -31,6 +32,7 @@ export function RoomPage() {
   const screenRef = useRef<MediaStream | null>(null)
   // Group mode starts with the call visible, but it's toggleable.
   const [callOpen, setCallOpen] = useState(true)
+  const [addOpen, setAddOpen] = useState(false)
 
   useEffect(() => {
     const name = user?.name || 'Guest'
@@ -102,6 +104,12 @@ export function RoomPage() {
         )}
 
         {isGroup && (
+          <button className="btn-ghost icon-only" onClick={() => setAddOpen(true)} title="Add members">
+            <AddPersonIcon />
+          </button>
+        )}
+
+        {isGroup && (
           <button className={`btn-ghost ${callOpen ? 'active' : ''}`} onClick={() => setCallOpen((v) => !v)}>
             👥 {callOpen ? 'Hide call' : 'Show call'}
           </button>
@@ -124,6 +132,8 @@ export function RoomPage() {
           />
         )}
       </div>
+
+      {addOpen && <AddMembersDialog roomId={roomId} onClose={() => setAddOpen(false)} />}
     </div>
   )
 }
