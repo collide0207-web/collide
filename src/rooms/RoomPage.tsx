@@ -29,6 +29,8 @@ export function RoomPage() {
   )
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null)
   const screenRef = useRef<MediaStream | null>(null)
+  // Group mode starts with the call visible, but it's toggleable.
+  const [callOpen, setCallOpen] = useState(true)
 
   useEffect(() => {
     const name = user?.name || 'Guest'
@@ -99,6 +101,12 @@ export function RoomPage() {
           </button>
         )}
 
+        {isGroup && (
+          <button className={`btn-ghost ${callOpen ? 'active' : ''}`} onClick={() => setCallOpen((v) => !v)}>
+            👥 {callOpen ? 'Hide call' : 'Show call'}
+          </button>
+        )}
+
         <button className="btn-danger" onClick={doLogout}>Log out</button>
       </div>
 
@@ -108,7 +116,7 @@ export function RoomPage() {
           a={layout === 'editor-left' ? editorEl : boardEl}
           b={layout === 'editor-left' ? boardEl : editorEl}
         />
-        {isGroup && (
+        {isGroup && callOpen && (
           <ParticipantsStrip
             selfName={user?.name || 'You'}
             isHost={isHost}
