@@ -1,61 +1,27 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { CamIcon, MicIcon } from './icons'
 
 /**
- * The local participant's tile. Uses the browser camera/mic (getUserMedia) so it's
- * real and testable with no backend. Mic/camera are toggled with the icon buttons
- * on the tile (no separate "Start camera" button).
- *
- * LATER: replace the local stream with a LiveKit local track; remote tiles become
- * real remote tracks.
+ * The local participant's tile. It renders the shared local stream owned by the
+ * `useCall` hook (so the same tracks are published to peers) and toggles mic/camera
+ * through the hook. Mic/camera are toggled with the icon buttons on the tile.
  */
-export function SelfVideoTile({ name }: { name: string }) {
+interface Props {
+  name: string
+  stream: MediaStream | null
+  camOn: boolean
+  micOn: boolean
+  onToggleCam: () => void
+  onToggleMic: () => void
+  error: string | null
+}
+
+export function SelfVideoTile({ name, stream, camOn, micOn, onToggleCam, onToggleMic, error }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null)
-  const streamRef = useRef<MediaStream | null>(null)
-  const [camOn, setCamOn] = useState(false)
-  const [micOn, setMicOn] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
-
-  async function ensureStream() {
-    if (streamRef.current) return streamRef.current
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-    streamRef.current = stream
-    if (videoRef.current) videoRef.current.srcObject = stream
-    // start muted/paused until the user toggles on
-    stream.getVideoTracks().forEach((t) => (t.enabled = false))
-    stream.getAudioTracks().forEach((t) => (t.enabled = false))
-    return stream
-  }
-
-  async function toggleCam() {
-    try {
-      const s = await ensureStream()
-      const next = !camOn
-      s.getVideoTracks().forEach((t) => (t.enabled = next))
-      setCamOn(next)
-      setErr(null)
-    } catch {
-      setErr('Camera/mic blocked')
-    }
-  }
-
-  async function toggleMic() {
-    try {
-      const s = await ensureStream()
-      const next = !micOn
-      s.getAudioTracks().forEach((t) => (t.enabled = next))
-      setMicOn(next)
-      setErr(null)
-    } catch {
-      setErr('Camera/mic blocked')
-    }
-  }
 
   useEffect(() => {
-    return () => {
-      streamRef.current?.getTracks().forEach((t) => t.stop())
-    }
-  }, [])
+    if (videoRef.current) videoRef.current.srcObject = stream
+  }, [stream])
 
   return (
     <div className="vtile">
@@ -67,21 +33,21 @@ export function SelfVideoTile({ name }: { name: string }) {
         <div className="vtile-controls">
           <button
             className={`icon-btn ${micOn ? '' : 'muted'}`}
-            onClick={toggleMic}
+            onClick={onToggleMic}
             title={micOn ? 'Mute' : 'Unmute'}
           >
             <MicIcon off={!micOn} />
           </button>
           <button
             className={`icon-btn ${camOn ? '' : 'muted'}`}
-            onClick={toggleCam}
+            onClick={onToggleCam}
             title={camOn ? 'Stop video' : 'Start video'}
           >
             <CamIcon off={!camOn} />
           </button>
         </div>
       </div>
-      {err && <div className="vtile-err">{err}</div>}
+      {error && <div className="vtile-err">{error}</div>}
     </div>
   )
 }

@@ -28,6 +28,15 @@ export interface RoomDoc {
 
 const cache = new Map<string, RoomDoc>()
 
+/** Access role from the invite link (?role=viewer|editor). Absent = full-access host. */
+function roleFromUrl(): string {
+  try {
+    return new URLSearchParams(window.location.search).get('role') || 'editor'
+  } catch {
+    return 'editor'
+  }
+}
+
 export function getRoomDoc(roomId: string): RoomDoc {
   let entry = cache.get(roomId)
   if (!entry) {
@@ -36,9 +45,12 @@ export function getRoomDoc(roomId: string): RoomDoc {
     const persistence = new IndexeddbPersistence(`collide-${roomId}`, doc)
     // WebsocketProvider connects to `${COLLAB_URL}/${roomId}` and auto-reconnects
     // with backoff; it queues local changes while offline and resyncs on reconnect.
+    // `role` lets the server enforce viewer read-only (drops a viewer's edits); the
+    // server clamps it so it can only downgrade access, never elevate.
     const provider = new WebsocketProvider(COLLAB_URL, roomId, doc, {
       connect: true,
-      // params: { token: '<jwt>' },  // enable once the control plane issues tokens
+      params: { role: roleFromUrl() },
+      // params.token: add the JWT once the control plane issues them.
     })
     entry = { doc, provider, persistence }
     cache.set(roomId, entry)

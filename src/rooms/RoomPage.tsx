@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { EditorColumn } from '../editor/EditorColumn'
 import { Whiteboard } from '../board/Whiteboard'
 import { ParticipantsStrip } from '../video/ParticipantsStrip'
+import { useCall } from '../video/useCall'
 import { SplitPane } from '../layout/SplitPane'
 import { ScreenIcon, AddPersonIcon } from '../video/icons'
 import { AddMembersDialog } from './AddMembersDialog'
@@ -25,11 +26,22 @@ export function RoomPage() {
   const mode: StudyMode = (search.get('mode') as StudyMode) || sessionMode
   const isGroup = mode === 'group'
 
+  // Access role comes from the invite link (?role=viewer|editor). Viewers get a
+  // read-only editor + board; the host and editors can edit. No role param = host.
+  // The role is also sent to the collab server, which enforces it (drops a viewer's
+  // edits) — this UI gate is the matching client-side half + good UX.
+  const role = search.get('role')
+  const canEdit = role !== 'viewer'
+
+  // The mesh video call — only active in group mode. Owns all local media.
+  // Dev connects anonymously via DEV_ALLOW_ANON (like the Yjs provider): the mock
+  // login token is not a real JWT, so sending it would be rejected. Pass the real
+  // JWT here once the control plane issues them.
+  const call = useCall(roomId, undefined, isGroup, role ?? undefined)
+
   const [layout, setLayout] = useState<Layout>(
     () => (localStorage.getItem(LAYOUT_KEY) as Layout) || 'editor-left',
   )
-  const [screenStream, setScreenStream] = useState<MediaStream | null>(null)
-  const screenRef = useRef<MediaStream | null>(null)
   // Group mode starts with the call visible, but it's toggleable.
   const [callOpen, setCallOpen] = useState(true)
   const [addOpen, setAddOpen] = useState(false)
@@ -40,10 +52,6 @@ export function RoomPage() {
     setPresence(roomId, { name, color })
   }, [roomId, user])
 
-  // In group mode the current user is the host and can always edit.
-  const canEdit = true
-  const isHost = isGroup
-
   function toggleLayout() {
     setLayout((l) => {
       const next = l === 'editor-left' ? 'editor-right' : 'editor-left'
@@ -52,28 +60,8 @@ export function RoomPage() {
     })
   }
 
-  async function toggleScreenShare() {
-    if (screenRef.current) {
-      screenRef.current.getTracks().forEach((t) => t.stop())
-      screenRef.current = null
-      setScreenStream(null)
-      return
-    }
-    try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true })
-      stream.getVideoTracks()[0]?.addEventListener('ended', () => {
-        screenRef.current = null
-        setScreenStream(null)
-      })
-      screenRef.current = stream
-      setScreenStream(stream)
-    } catch {
-      /* user cancelled the picker */
-    }
-  }
-
   function doLogout() {
-    screenRef.current?.getTracks().forEach((t) => t.stop())
+    // useCall's cleanup stops all media + closes peers when RoomPage unmounts.
     logout()
     navigate('/login')
   }
@@ -91,6 +79,7 @@ export function RoomPage() {
       <div className="topbar">
         <span className="title"><span className="brand-logo">◆</span> Collide</span>
         <span className={`mode-chip ${mode}`}>{isGroup ? 'Group session' : 'Self study'}</span>
+        {!canEdit && <span className="mode-chip viewer" title="You joined as a viewer">👁 Read-only</span>}
         <span className="spacer" />
 
         <button className="btn-ghost" onClick={toggleLayout} title="Swap editor / notes sides">
@@ -98,8 +87,8 @@ export function RoomPage() {
         </button>
 
         {isGroup && (
-          <button className={`btn-ghost ${screenStream ? 'active' : ''}`} onClick={toggleScreenShare}>
-            <ScreenIcon /> {screenStream ? 'Stop share' : 'Share screen'}
+          <button className={`btn-ghost ${call.sharing ? 'active' : ''}`} onClick={call.toggleScreenShare}>
+            <ScreenIcon /> {call.sharing ? 'Stop share' : 'Share screen'}
           </button>
         )}
 
@@ -125,11 +114,7 @@ export function RoomPage() {
           b={layout === 'editor-left' ? boardEl : editorEl}
         />
         {isGroup && callOpen && (
-          <ParticipantsStrip
-            selfName={user?.name || 'You'}
-            isHost={isHost}
-            screenStream={screenStream}
-          />
+          <ParticipantsStrip selfName={user?.name || 'You'} call={call} />
         )}
       </div>
 

@@ -107,6 +107,7 @@ input:focus, select:focus { border-color: var(--accent); }
   background: rgba(91, 140, 255, 0.14); color: #a9c1ff;
 }
 .mode-chip.group { background: rgba(61, 214, 140, 0.14); color: #7fe6b4; }
+.mode-chip.viewer { background: rgba(255, 207, 92, 0.16); color: #ffcf5c; }
 
 .workspace { flex: 1; display: flex; min-height: 0; }
 
@@ -176,6 +177,32 @@ input:focus, select:focus { border-color: var(--accent); }
   position: absolute; top: 10px; left: 10px; z-index: 300; font-size: 10px; letter-spacing: 0.08em;
   background: rgba(0, 0, 0, 0.55); color: #fff; padding: 3px 9px; border-radius: 6px; pointer-events: none;
 }
+/* ---------- Toolbar minimize/maximize ---------- */
+/* tldraw's .tlui-layout sets pointer-events:none and re-enables it only on its
+   own controls, so our button must opt back in or real mouse clicks never land. */
+.collide-toolbar-shell {
+  display: flex; flex-direction: column; align-items: center;
+  padding-bottom: calc(var(--space-3) + var(--sab, 0px));
+}
+.collide-toolbar-toggle {
+  pointer-events: all; z-index: 2; width: 40px; height: 16px; padding: 0;
+  border: 1px solid var(--color-divider); border-bottom: none; border-radius: 7px 7px 0 0;
+  background: var(--color-panel); color: var(--color-text-1); box-shadow: var(--shadow-1);
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.collide-toolbar-toggle:hover { background: var(--color-muted-2); color: var(--color-text); }
+.collide-toolbar-toggle svg { transition: transform 180ms ease; }
+.collide-toolbar-toggle[data-collapsed='true'] svg { transform: rotate(180deg); }
+.collide-toolbar-track {
+  display: grid; grid-template-rows: 1fr; transition: grid-template-rows 180ms ease;
+  pointer-events: none;
+}
+.collide-toolbar-track[data-collapsed='true'] { grid-template-rows: 0fr; }
+.collide-toolbar-clip { overflow: hidden; min-height: 0; }
+/* The wrapped .tlui-toolbar keeps its own padding-bottom; drop it so our shell
+   controls the bottom offset and the tab sits flush against the toolbar. */
+.collide-toolbar-clip .tlui-toolbar { padding-bottom: 0; }
+
 .readonly-banner {
   position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
   z-index: 10; background: var(--danger); color: #fff; font-size: 12px; padding: 4px 12px; border-radius: 999px;
@@ -200,6 +227,30 @@ input:focus, select:focus { border-color: var(--accent); }
 .vtile video { width: 100%; height: 100%; object-fit: cover; }
 .vtile video.off { display: none; }
 .vtile.screen { aspect-ratio: 16 / 9; }
+.vtile.clickable { cursor: pointer; }
+.vtile.clickable:hover { border-color: var(--accent); }
+.vtile-expand {
+  position: absolute; top: 6px; right: 6px; z-index: 1; display: inline-flex;
+  align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 7px;
+  background: rgba(0, 0, 0, 0.55); color: #fff; font-size: 13px; opacity: 0; transition: opacity 0.15s;
+}
+.vtile.clickable:hover .vtile-expand { opacity: 1; }
+
+/* ---------- Maximized screen-share overlay ---------- */
+.screen-max-backdrop {
+  position: fixed; inset: 0; z-index: 60; background: rgba(0, 0, 0, 0.82);
+  display: flex; align-items: center; justify-content: center; padding: 32px;
+}
+.screen-max {
+  position: relative; width: 100%; height: 100%; max-width: 1600px;
+  display: flex; align-items: center; justify-content: center;
+}
+.screen-max video { max-width: 100%; max-height: 100%; border-radius: 12px; background: #000; }
+.screen-max-bar {
+  position: absolute; left: 0; right: 0; bottom: 0; padding: 10px 14px;
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.7)); border-radius: 0 0 12px 12px;
+}
 .vtile-avatar {
   width: 52px; height: 52px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), #9b6bff);
   color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 18px;

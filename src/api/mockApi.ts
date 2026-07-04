@@ -82,7 +82,9 @@ export const mockApi: Api = {
     return {
       token,
       role,
-      url: `${location.origin}/room/${roomId}?role=${role}&t=${token}`,
+      // mode=group so the invitee lands in the shared session (with the call),
+      // not the solo view.
+      url: `${location.origin}/room/${roomId}?mode=group&role=${role}&t=${token}`,
     }
   },
 }

@@ -1,29 +1,40 @@
-import type { Role } from '../api/types'
+import { useEffect, useRef } from 'react'
 import { CamIcon, MicIcon } from './icons'
-
-export interface Participant {
-  id: string
-  name: string
-  role: Role
-  micOn: boolean
-  camOn: boolean
-}
+import type { RemoteParticipant } from './useCall'
 
 interface Props {
-  p: Participant
-  /** Whether the current user is the host and can change roles. */
-  canManage: boolean
-  onChangeRole: (id: string, role: Role) => void
-  onRemove: (id: string) => void
+  p: RemoteParticipant
+  onMaximize?: () => void
 }
 
-const ASSIGNABLE: Role[] = ['editor', 'viewer']
+/**
+ * A remote participant's tile. Renders their live WebRTC stream (camera or, while
+ * they share, their screen) and reflects mic/camera state broadcast over signaling.
+ * Role management lives in the Share/members dialog, not on the call tile.
+ *
+ * While they're sharing their screen the tile becomes clickable — clicking it asks
+ * the strip to maximize their screen into a full-room overlay.
+ */
+export function ParticipantTile({ p, onMaximize }: Props) {
+  const videoRef = useRef<HTMLVideoElement | null>(null)
 
-/** A remote participant's tile (placeholder video). Host can change their role live. */
-export function ParticipantTile({ p, canManage, onChangeRole, onRemove }: Props) {
+  useEffect(() => {
+    if (videoRef.current) videoRef.current.srcObject = p.stream
+  }, [p.stream])
+
+  // Show video when they have the camera on or are sharing their screen.
+  const showVideo = (p.camOn || p.sharing) && !!p.stream
+  const canMaximize = p.sharing && !!p.stream
+
   return (
-    <div className="vtile remote">
-      <div className="vtile-avatar">{initials(p.name)}</div>
+    <div
+      className={`vtile remote${canMaximize ? ' clickable' : ''}`}
+      onClick={canMaximize ? onMaximize : undefined}
+      title={canMaximize ? `Click to maximize ${p.name}'s screen` : undefined}
+    >
+      <video ref={videoRef} autoPlay playsInline className={showVideo ? 'live' : 'off'} />
+      {canMaximize && <span className="vtile-expand" aria-hidden>⛶</span>}
+      {!showVideo && <div className="vtile-avatar">{initials(p.name)}</div>}
 
       <div className="vtile-bar">
         <span className="vtile-name">
@@ -35,17 +46,6 @@ export function ParticipantTile({ p, canManage, onChangeRole, onRemove }: Props)
           <span className={`state-dot ${p.camOn ? 'on' : 'off'}`}><CamIcon off={!p.camOn} /></span>
         </div>
       </div>
-
-      {canManage && p.role !== 'owner' && (
-        <div className="vtile-manage">
-          <select value={p.role} onChange={(e) => onChangeRole(p.id, e.target.value as Role)} title="Change role">
-            {ASSIGNABLE.map((r) => (
-              <option key={r} value={r}>{r}</option>
-            ))}
-          </select>
-          <button className="icon-btn danger" title="Remove" onClick={() => onRemove(p.id)}>✕</button>
-        </div>
-      )}
     </div>
   )
 }

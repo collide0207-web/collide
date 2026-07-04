@@ -4,9 +4,11 @@ import 'tldraw/tldraw.css'
 import { focusBoard, registerBoard } from './boardFocus'
 import { bindTldrawToYjs } from './tldrawYjs'
 import { getRoomDoc } from '../collab/yjs'
+import { CollapsibleToolbar } from './CollapsibleToolbar'
 
 // Hide the multi-page UI — notes are a single infinite, pannable canvas.
-const components: TLComponents = { PageMenu: null }
+// Toolbar is wrapped so the tool selection row can be minimized/maximized.
+const components: TLComponents = { PageMenu: null, Toolbar: CollapsibleToolbar }
 
 type NoteTheme = 'light' | 'dark'
 const THEME_KEY = 'collide-notes-theme'
