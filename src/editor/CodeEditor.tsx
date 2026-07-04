@@ -1,5 +1,6 @@
 import Editor, { BeforeMount, OnMount } from '@monaco-editor/react'
 import { useEffect, useRef } from 'react'
+import * as Y from 'yjs'
 import { MonacoBinding } from 'y-monaco'
 import { getRoomDoc } from '../collab/yjs'
 import { blurBoard } from '../board/boardFocus'
@@ -36,13 +37,30 @@ const defineThemes: BeforeMount = (monaco) => {
  */
 export function CodeEditor({ roomId, filePath, language, theme, readOnly }: Props) {
   const bindingRef = useRef<MonacoBinding | null>(null)
+  const undoRef = useRef<Y.UndoManager | null>(null)
 
-  const handleMount: OnMount = (editor) => {
+  const handleMount: OnMount = (editor, monaco) => {
     const { doc, provider } = getRoomDoc(roomId)
     const yText = doc.getText(`file:${filePath}`)
     const model = editor.getModel()
     if (model) {
-      bindingRef.current = new MonacoBinding(yText, model, new Set([editor]), provider.awareness)
+      const binding = new MonacoBinding(yText, model, new Set([editor]), provider.awareness)
+      bindingRef.current = binding
+
+      // Per-user undo/redo: the UndoManager tracks ONLY edits whose transaction
+      // origin is this binding (i.e. this user's edits), so Ctrl/Cmd+Z never undoes
+      // a collaborator's work. It operates on the CRDT, so it stays correct after
+      // sync/reconnect.
+      const undoManager = new Y.UndoManager(yText, { trackedOrigins: new Set([binding]) })
+      undoRef.current = undoManager
+
+      // Route the editor's undo/redo keys to the CRDT UndoManager instead of
+      // Monaco's model-level undo (which would fight the shared document).
+      const { CtrlCmd, Shift } = monaco.KeyMod
+      const { KeyZ, KeyY } = monaco.KeyCode
+      editor.addCommand(CtrlCmd | KeyZ, () => undoManager.undo())
+      editor.addCommand(CtrlCmd | Shift | KeyZ, () => undoManager.redo())
+      editor.addCommand(CtrlCmd | KeyY, () => undoManager.redo())
     }
     // Seed sample content once, only if the shared doc is still empty (give peers a
     // moment to sync first so we don't double-insert).
@@ -57,6 +75,8 @@ export function CodeEditor({ roomId, filePath, language, theme, readOnly }: Prop
 
   useEffect(() => {
     return () => {
+      undoRef.current?.destroy()
+      undoRef.current = null
       bindingRef.current?.destroy()
       bindingRef.current = null
     }

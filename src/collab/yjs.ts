@@ -1,19 +1,29 @@
 import * as Y from 'yjs'
-import { WebrtcProvider } from 'y-webrtc'
+import { WebsocketProvider } from 'y-websocket'
+import { IndexeddbPersistence } from 'y-indexeddb'
 
 /**
- * One Y.Doc per room, shared by the code editor and (later) the whiteboard.
+ * One Y.Doc per room, shared by the code editor and the whiteboard. The doc holds
+ * every file's text (getText("file:<path>")) and the tldraw notes map.
  *
- * For the frontend-first phase we use the y-webrtc provider. Across two tabs on
- * the same origin it also syncs via BroadcastChannel, so live co-editing works
- * with NO backend running.
+ * Transport: the `collab` sync server (Node/Yjs) over WebSocket. The server is
+ * document-agnostic — it syncs whatever structures live in this doc. We connect one
+ * socket per room (docId = roomId).
  *
- * LATER: swap WebrtcProvider for the Hocuspocus/y-websocket provider pointing at
- * the real sync server. The rest of the app (MonacoBinding, awareness) is unchanged.
+ * Offline: IndexeddbPersistence caches the doc locally, so edits continue with the
+ * server down and merge automatically on reconnect (no lost work).
+ *
+ * AUTH: the dev server allows anonymous connections (DEV_ALLOW_ANON). When the Java
+ * control plane exists, append `?token=<jwt>` to the params below.
  */
+
+// e.g. VITE_COLLAB_URL=ws://localhost:4000/doc  (base; roomId is appended by the provider)
+const COLLAB_URL = (import.meta.env.VITE_COLLAB_URL as string) || 'ws://localhost:4000/doc'
+
 export interface RoomDoc {
   doc: Y.Doc
-  provider: WebrtcProvider
+  provider: WebsocketProvider
+  persistence: IndexeddbPersistence
 }
 
 const cache = new Map<string, RoomDoc>()
@@ -22,8 +32,15 @@ export function getRoomDoc(roomId: string): RoomDoc {
   let entry = cache.get(roomId)
   if (!entry) {
     const doc = new Y.Doc()
-    const provider = new WebrtcProvider(`collab-ide-room-${roomId}`, doc)
-    entry = { doc, provider }
+    // Local-first cache for offline + instant reload.
+    const persistence = new IndexeddbPersistence(`collide-${roomId}`, doc)
+    // WebsocketProvider connects to `${COLLAB_URL}/${roomId}` and auto-reconnects
+    // with backoff; it queues local changes while offline and resyncs on reconnect.
+    const provider = new WebsocketProvider(COLLAB_URL, roomId, doc, {
+      connect: true,
+      // params: { token: '<jwt>' },  // enable once the control plane issues tokens
+    })
+    entry = { doc, provider, persistence }
     cache.set(roomId, entry)
   }
   return entry
@@ -33,4 +50,13 @@ export function getRoomDoc(roomId: string): RoomDoc {
 export function setPresence(roomId: string, user: { name: string; color: string }) {
   const { provider } = getRoomDoc(roomId)
   provider.awareness.setLocalStateField('user', user)
+}
+
+/** Live connection status for a room ("connected" | "connecting" | "disconnected"). */
+export function onConnectionStatus(roomId: string, cb: (status: string) => void): () => void {
+  const { provider } = getRoomDoc(roomId)
+  const handler = (e: { status: string }) => cb(e.status)
+  provider.on('status', handler)
+  cb(provider.wsconnected ? 'connected' : 'connecting')
+  return () => provider.off('status', handler)
 }
