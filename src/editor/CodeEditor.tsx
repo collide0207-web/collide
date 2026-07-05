@@ -4,14 +4,18 @@ import * as Y from 'yjs'
 import { MonacoBinding } from 'y-monaco'
 import { getRoomDoc } from '../collab/yjs'
 import { blurBoard } from '../board/boardFocus'
-import { SAMPLE_CONTENT } from './files'
 
 interface Props {
   roomId: string
-  filePath: string
+  /** Stable file id; content lives at doc.getText(`file:<fileId>`). */
+  fileId: string
   language: string
   theme: string
   readOnly: boolean
+  /** Focus the editor on mount (used when a file was just created). */
+  autoFocus?: boolean
+  /** Receive the editor instance so the parent can force a synchronous relayout. */
+  onEditorMount?: (editor: { layout: () => void }) => void
 }
 
 /** Define a couple of custom Monaco themes on top of the built-ins. */
@@ -32,16 +36,16 @@ const defineThemes: BeforeMount = (monaco) => {
 
 /**
  * One editor bound to the shared Yjs text for the given file. The parent remounts
- * this component (via key={filePath}) when the file changes, so each file gets a
+ * this component (via key={fileId}) when the file changes, so each file gets a
  * fresh binding to its own Y.Text.
  */
-export function CodeEditor({ roomId, filePath, language, theme, readOnly }: Props) {
+export function CodeEditor({ roomId, fileId, language, theme, readOnly, autoFocus, onEditorMount }: Props) {
   const bindingRef = useRef<MonacoBinding | null>(null)
   const undoRef = useRef<Y.UndoManager | null>(null)
 
   const handleMount: OnMount = (editor, monaco) => {
     const { doc, provider } = getRoomDoc(roomId)
-    const yText = doc.getText(`file:${filePath}`)
+    const yText = doc.getText(`file:${fileId}`)
     const model = editor.getModel()
     if (model) {
       const binding = new MonacoBinding(yText, model, new Set([editor]), provider.awareness)
@@ -62,15 +66,9 @@ export function CodeEditor({ roomId, filePath, language, theme, readOnly }: Prop
       editor.addCommand(CtrlCmd | Shift | KeyZ, () => undoManager.redo())
       editor.addCommand(CtrlCmd | KeyY, () => undoManager.redo())
     }
-    // Seed sample content once, only if the shared doc is still empty (give peers a
-    // moment to sync first so we don't double-insert).
-    const seed = SAMPLE_CONTENT[filePath]
-    if (seed) {
-      setTimeout(() => {
-        if (yText.length === 0) yText.insert(0, seed)
-      }, 400)
-    }
     editor.onDidFocusEditorText(() => blurBoard())
+    if (autoFocus) editor.focus()
+    onEditorMount?.(editor)
   }
 
   useEffect(() => {
