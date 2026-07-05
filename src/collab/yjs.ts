@@ -13,8 +13,10 @@ import { IndexeddbPersistence } from 'y-indexeddb'
  * Offline: IndexeddbPersistence caches the doc locally, so edits continue with the
  * server down and merge automatically on reconnect (no lost work).
  *
- * AUTH: the dev server allows anonymous connections (DEV_ALLOW_ANON). When the Java
- * control plane exists, append `?token=<jwt>` to the params below.
+ * AUTH: the sync server verifies `?token=<jwt>` at connect (or allows anonymous with
+ * DEV_ALLOW_ANON). Access tokens are short-lived, so we keep the current token in a
+ * shared params object and update it via setCollabToken(); the next (re)connect picks
+ * up the fresh token — the "refresh then reconnect" model. See store/session.ts.
  */
 
 // e.g. VITE_COLLAB_URL=ws://localhost:4000/doc  (base; roomId is appended by the provider)
@@ -28,12 +30,34 @@ export interface RoomDoc {
 
 const cache = new Map<string, RoomDoc>()
 
+/** Current access token used to authenticate the WebSocket. Updated on login/refresh. */
+let collabToken: string | null = null
+
 /** Access role from the invite link (?role=viewer|editor). Absent = full-access host. */
 function roleFromUrl(): string {
   try {
     return new URLSearchParams(window.location.search).get('role') || 'editor'
   } catch {
     return 'editor'
+  }
+}
+
+/** Build the WebSocket query params (role + token) read on each (re)connect. */
+function buildParams(): Record<string, string> {
+  const params: Record<string, string> = { role: roleFromUrl() }
+  if (collabToken) params.token = collabToken
+  return params
+}
+
+/**
+ * Update the token used for the collab WebSocket. Called by the session store on
+ * login/refresh/logout. Mutates each live provider's params so the next reconnect
+ * authenticates with the fresh token (auth happens at connect time on the server).
+ */
+export function setCollabToken(token: string | null): void {
+  collabToken = token
+  for (const entry of cache.values()) {
+    ;(entry.provider as unknown as { params: Record<string, string> }).params = buildParams()
   }
 }
 
@@ -49,8 +73,8 @@ export function getRoomDoc(roomId: string): RoomDoc {
     // server clamps it so it can only downgrade access, never elevate.
     const provider = new WebsocketProvider(COLLAB_URL, roomId, doc, {
       connect: true,
-      params: { role: roleFromUrl() },
-      // params.token: add the JWT once the control plane issues them.
+      // role + token; the server clamps role (can only downgrade) and verifies the token.
+      params: buildParams(),
     })
     entry = { doc, provider, persistence }
     cache.set(roomId, entry)

@@ -1,12 +1,14 @@
-import type { Api, Member, Role, Room, ShareLink, User } from './types'
+import type { Api, AuthResult, Member, Role, Room, ShareLink, SignupInput, User } from './types'
 
 /**
- * In-memory + localStorage mock of the backend. Stands in until the Spring Boot
- * control plane exists. NOTHING here is a security boundary — roles are advisory
- * UI state only. Real auth/enforcement lands with the backend.
+ * In-memory + localStorage mock of the backend. Stands in for local UI work when
+ * VITE_API_URL is not set. NOTHING here is a security boundary — tokens are fake and
+ * roles are advisory UI state only. Real auth/enforcement lives in the Spring Boot
+ * control plane (see httpApi.ts).
  */
 
 const LS_KEY = 'collab-ide-mock'
+const USER_KEY = 'collab-ide-mock-user'
 
 interface Store {
   rooms: Record<string, Room>
@@ -28,12 +30,84 @@ function save(s: Store) {
 let id = 0
 const nextId = (p: string) => `${p}_${Date.now().toString(36)}_${id++}`
 
+function rememberUser(user: User) {
+  try {
+    localStorage.setItem(USER_KEY, JSON.stringify(user))
+  } catch {
+    /* ignore */
+  }
+}
+
+function currentUser(): User | null {
+  try {
+    const raw = localStorage.getItem(USER_KEY)
+    return raw ? (JSON.parse(raw) as User) : null
+  } catch {
+    return null
+  }
+}
+
+function fakeAuth(user: User): AuthResult {
+  rememberUser(user)
+  return {
+    user,
+    accessToken: `mock-access-${user.id}`,
+    refreshToken: `mock-refresh-${user.id}`,
+    expiresIn: 900,
+  }
+}
+
 export const mockApi: Api = {
-  async login(email, name) {
-    const user: User = { id: nextId('u'), name, email }
-    return { user, token: `mock-jwt-${user.id}` }
+  // --- auth (fake) ---
+  async signup(input: SignupInput) {
+    const user: User = {
+      id: nextId('u'),
+      name: input.name,
+      email: input.email,
+      username: input.username,
+      role: 'USER',
+      emailVerified: false,
+    }
+    return fakeAuth(user)
   },
 
+  async login(email, _password) {
+    const user: User = { id: nextId('u'), name: email.split('@')[0], email, role: 'USER' }
+    return fakeAuth(user)
+  },
+
+  async loginWithGoogle(_idToken) {
+    const user: User = {
+      id: nextId('u'),
+      name: 'Google User',
+      email: 'google.user@example.com',
+      role: 'USER',
+      emailVerified: true,
+    }
+    return fakeAuth(user)
+  },
+
+  async refresh(refreshToken) {
+    const user = currentUser()
+    if (!user) throw new Error('not authenticated')
+    return { user, accessToken: refreshToken.replace('refresh', 'access'), refreshToken, expiresIn: 900 }
+  },
+
+  async logout(_refreshToken) {
+    try {
+      localStorage.removeItem(USER_KEY)
+    } catch {
+      /* ignore */
+    }
+  },
+
+  async me() {
+    const u = currentUser()
+    if (!u) throw new Error('not authenticated')
+    return u
+  },
+
+  // --- rooms ---
   async createRoom(name) {
     const s = load()
     const ownerId = 'me'
@@ -49,7 +123,6 @@ export const mockApi: Api = {
   async getRoom(roomId) {
     const s = load()
     if (!s.rooms[roomId]) {
-      // allow opening an unknown room id (e.g. via a shared link) as a fresh room
       s.rooms[roomId] = { id: roomId, name: 'Shared Room', ownerId: 'me' }
       s.members[roomId] = [
         { user: { id: 'me', name: 'You', email: 'you@example.com' }, role: 'owner' },
@@ -82,8 +155,6 @@ export const mockApi: Api = {
     return {
       token,
       role,
-      // mode=group so the invitee lands in the shared session (with the call),
-      // not the solo view.
       url: `${location.origin}/room/${roomId}?mode=group&role=${role}&t=${token}`,
     }
   },

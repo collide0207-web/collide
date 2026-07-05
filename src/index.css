@@ -73,6 +73,24 @@ input, select {
 }
 input:focus, select:focus { border-color: var(--accent); }
 .fineprint { font-size: 12px; color: var(--muted); margin-top: 14px; text-align: center; }
+.auth-error {
+  font-size: 13px; color: #f87171; background: rgba(248, 113, 113, 0.1);
+  border: 1px solid rgba(248, 113, 113, 0.3); border-radius: 8px; padding: 8px 10px; margin: 4px 0 0;
+}
+.auth-divider {
+  display: flex; align-items: center; text-align: center; color: var(--muted);
+  font-size: 12px; margin: 16px 0;
+}
+.auth-divider::before, .auth-divider::after {
+  content: ''; flex: 1; border-bottom: 1px solid var(--border);
+}
+.auth-divider::before { margin-right: 12px; }
+.auth-divider::after { margin-left: 12px; }
+.google-btn { display: flex; justify-content: center; min-height: 40px; }
+.linklike {
+  background: none; border: none; color: var(--accent); cursor: pointer;
+  font: inherit; padding: 0; text-decoration: underline;
+}
 
 /* ---------- Mode select ---------- */
 .mode-wrap { height: 100%; display: flex; flex-direction: column; }
