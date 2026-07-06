@@ -86,7 +86,15 @@ export function RoomPage() {
     navigate('/login')
   }
 
-  const editorEl = <EditorColumn roomId={roomId} canEdit={canEdit} onActiveFile={setActiveFileId} />
+  // Interviews focus on the seeded file — no file explorer.
+  const editorEl = (
+    <EditorColumn
+      roomId={roomId}
+      canEdit={canEdit}
+      showExplorer={!isInterview}
+      onActiveFile={setActiveFileId}
+    />
+  )
 
   // In an interview with questions, the side pane defaults to the question panel
   // and toggles to the whiteboard. Otherwise it's always the whiteboard.

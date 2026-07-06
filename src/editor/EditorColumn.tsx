@@ -10,6 +10,8 @@ import { useFileSystem } from './fileSystem'
 interface Props {
   roomId: string
   canEdit: boolean
+  /** Hide the file explorer and its toggle (interview rooms focus on one file). */
+  showExplorer?: boolean
   /** Report the focused file up so an interview's question panel can run it. */
   onActiveFile?: (id: string | null) => void
 }
@@ -42,7 +44,7 @@ const THEMES = [
   { id: 'collide-github', label: 'GitHub Light' },
 ]
 
-export function EditorColumn({ roomId, canEdit, onActiveFile }: Props) {
+export function EditorColumn({ roomId, canEdit, showExplorer = true, onActiveFile }: Props) {
   const fs = useFileSystem(roomId)
   const { nodesById, ops } = fs
 
@@ -160,13 +162,15 @@ export function EditorColumn({ roomId, canEdit, onActiveFile }: Props) {
   return (
     <div className="editor-col">
       <div className="editor-toolbar">
-        <button
-          className={`btn-ghost icon-only ${showTree ? 'active' : ''}`}
-          onClick={() => setShowTree((v) => !v)}
-          title={showTree ? 'Hide file explorer' : 'Show file explorer'}
-        >
-          🗂
-        </button>
+        {showExplorer && (
+          <button
+            className={`btn-ghost icon-only ${showTree ? 'active' : ''}`}
+            onClick={() => setShowTree((v) => !v)}
+            title={showTree ? 'Hide file explorer' : 'Show file explorer'}
+          >
+            🗂
+          </button>
+        )}
         <span className="file-crumb" title={activePath}>{activePath ? activePath.split('/').join('  ›  ') : 'No file open'}</span>
         <span className="spacer" />
         <select value={language} onChange={(e) => setLanguageOverride(e.target.value)} title="Language">
@@ -185,7 +189,7 @@ export function EditorColumn({ roomId, canEdit, onActiveFile }: Props) {
       </div>
 
       <div className="editor-main">
-        {showTree && (
+        {showExplorer && showTree && (
           <FileTree roomId={roomId} fs={fs} activeId={activeId} onOpen={(id, focus) => openFile(id, !!focus)} onDeleted={onDeleted} />
         )}
         <div className="editor-stack">
