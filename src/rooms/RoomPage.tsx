@@ -43,8 +43,13 @@ export function RoomPage() {
   // JWT here once the control plane issues them.
   const call = useCall(roomId, undefined, isLive, role ?? undefined)
 
+  // Interview rooms show the question pane on the left by default, so they keep
+  // their own saved layout preference instead of the shared one.
+  const layoutKey = isInterview ? `${LAYOUT_KEY}-interview` : LAYOUT_KEY
   const [layout, setLayout] = useState<Layout>(
-    () => (localStorage.getItem(LAYOUT_KEY) as Layout) || 'editor-left',
+    () =>
+      (localStorage.getItem(layoutKey) as Layout) ||
+      (isInterview ? 'editor-right' : 'editor-left'),
   )
   // Live modes start with the call visible, but it's toggleable.
   const [callOpen, setCallOpen] = useState(true)
@@ -53,7 +58,7 @@ export function RoomPage() {
   const [activeFileId, setActiveFileId] = useState<string | null>(null)
   // Whether this interview has questions (drives the Question ↔ Drawing toggle).
   const [hasQuestions, setHasQuestions] = useState(false)
-  // In interview mode, the right pane shows the question by default; toggle to draw.
+  // In interview mode, the side pane shows the question by default; toggle to draw.
   const [showBoard, setShowBoard] = useState(false)
 
   useEffect(() => {
@@ -70,7 +75,7 @@ export function RoomPage() {
   function toggleLayout() {
     setLayout((l) => {
       const next = l === 'editor-left' ? 'editor-right' : 'editor-left'
-      localStorage.setItem(LAYOUT_KEY, next)
+      localStorage.setItem(layoutKey, next)
       return next
     })
   }
@@ -83,7 +88,7 @@ export function RoomPage() {
 
   const editorEl = <EditorColumn roomId={roomId} canEdit={canEdit} onActiveFile={setActiveFileId} />
 
-  // In an interview with questions, the right pane defaults to the question panel
+  // In an interview with questions, the side pane defaults to the question panel
   // and toggles to the whiteboard. Otherwise it's always the whiteboard.
   const showQuestion = isInterview && hasQuestions && !showBoard
   const boardEl = (
