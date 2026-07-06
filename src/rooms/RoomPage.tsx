@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { EditorColumn } from '../editor/EditorColumn'
 import { Whiteboard } from '../board/Whiteboard'
+import { QuestionPanel } from './QuestionPanel'
 import { ParticipantsStrip } from '../video/ParticipantsStrip'
 import { useCall } from '../video/useCall'
 import { SplitPane } from '../layout/SplitPane'
 import { ScreenIcon, AddPersonIcon } from '../video/icons'
 import { AddMembersDialog } from './AddMembersDialog'
 import { setPresence } from '../collab/yjs'
+import { observeInterviewQuestions } from '../collab/interview'
 import { useSession, type StudyMode } from '../store/session'
 
 const COLORS = ['#5b8cff', '#ff6b8b', '#3dd68c', '#ffcf5c', '#c084fc']
@@ -24,7 +26,9 @@ export function RoomPage() {
   const logout = useSession((s) => s.logout)
 
   const mode: StudyMode = (search.get('mode') as StudyMode) || sessionMode
-  const isGroup = mode === 'group'
+  const isInterview = mode === 'interview'
+  // Video/call features are shared by group and interview sessions.
+  const isLive = mode === 'group' || isInterview
 
   // Access role comes from the invite link (?role=viewer|editor). Viewers get a
   // read-only editor + board; the host and editors can edit. No role param = host.
@@ -33,24 +37,35 @@ export function RoomPage() {
   const role = search.get('role')
   const canEdit = role !== 'viewer'
 
-  // The mesh video call — only active in group mode. Owns all local media.
-  // Dev connects anonymously via DEV_ALLOW_ANON (like the Yjs provider): the mock
-  // login token is not a real JWT, so sending it would be rejected. Pass the real
+  // The mesh video call — only active in live (group/interview) mode. Owns all local
+  // media. Dev connects anonymously via DEV_ALLOW_ANON (like the Yjs provider): the
+  // mock login token is not a real JWT, so sending it would be rejected. Pass the real
   // JWT here once the control plane issues them.
-  const call = useCall(roomId, undefined, isGroup, role ?? undefined)
+  const call = useCall(roomId, undefined, isLive, role ?? undefined)
 
   const [layout, setLayout] = useState<Layout>(
     () => (localStorage.getItem(LAYOUT_KEY) as Layout) || 'editor-left',
   )
-  // Group mode starts with the call visible, but it's toggleable.
+  // Live modes start with the call visible, but it's toggleable.
   const [callOpen, setCallOpen] = useState(true)
   const [addOpen, setAddOpen] = useState(false)
+  // The editor reports its focused file so the question panel can run tests on it.
+  const [activeFileId, setActiveFileId] = useState<string | null>(null)
+  // Whether this interview has questions (drives the Question ↔ Drawing toggle).
+  const [hasQuestions, setHasQuestions] = useState(false)
+  // In interview mode, the right pane shows the question by default; toggle to draw.
+  const [showBoard, setShowBoard] = useState(false)
 
   useEffect(() => {
     const name = user?.name || 'Guest'
     const color = COLORS[Math.abs(hash(name)) % COLORS.length]
     setPresence(roomId, { name, color })
   }, [roomId, user])
+
+  useEffect(() => {
+    if (!isInterview) return
+    return observeInterviewQuestions(roomId, (qs) => setHasQuestions(qs.length > 0))
+  }, [roomId, isInterview])
 
   function toggleLayout() {
     setLayout((l) => {
@@ -66,11 +81,19 @@ export function RoomPage() {
     navigate('/login')
   }
 
-  const editorEl = <EditorColumn roomId={roomId} canEdit={canEdit} />
+  const editorEl = <EditorColumn roomId={roomId} canEdit={canEdit} onActiveFile={setActiveFileId} />
+
+  // In an interview with questions, the right pane defaults to the question panel
+  // and toggles to the whiteboard. Otherwise it's always the whiteboard.
+  const showQuestion = isInterview && hasQuestions && !showBoard
   const boardEl = (
     <div className="board-pane">
-      <span className="pane-label">NOTES</span>
-      <Whiteboard roomId={roomId} readOnly={!canEdit} />
+      <span className="pane-label">{showQuestion ? 'QUESTION' : 'NOTES'}</span>
+      {showQuestion ? (
+        <QuestionPanel roomId={roomId} activeFileId={activeFileId} />
+      ) : (
+        <Whiteboard roomId={roomId} readOnly={!canEdit} />
+      )}
     </div>
   )
 
@@ -78,27 +101,35 @@ export function RoomPage() {
     <div className="room">
       <div className="topbar">
         <span className="title"><span className="brand-logo">◆</span> Collide</span>
-        <span className={`mode-chip ${mode}`}>{isGroup ? 'Group session' : 'Self study'}</span>
+        <span className={`mode-chip ${mode}`}>
+          {isInterview ? 'Interview' : mode === 'group' ? 'Group session' : 'Self study'}
+        </span>
         {!canEdit && <span className="mode-chip viewer" title="You joined as a viewer">👁 Read-only</span>}
         <span className="spacer" />
+
+        {isInterview && hasQuestions && (
+          <button className="btn-ghost" onClick={() => setShowBoard((v) => !v)} title="Switch the side pane">
+            {showBoard ? '📝 Show question' : '✏️ Show drawing'}
+          </button>
+        )}
 
         <button className="btn-ghost" onClick={toggleLayout} title="Swap editor / notes sides">
           ⇄ {layout === 'editor-left' ? 'Editor left' : 'Editor right'}
         </button>
 
-        {isGroup && (
+        {isLive && (
           <button className={`btn-ghost ${call.sharing ? 'active' : ''}`} onClick={call.toggleScreenShare}>
             <ScreenIcon /> {call.sharing ? 'Stop share' : 'Share screen'}
           </button>
         )}
 
-        {isGroup && (
+        {isLive && (
           <button className="btn-ghost icon-only" onClick={() => setAddOpen(true)} title="Add members">
             <AddPersonIcon />
           </button>
         )}
 
-        {isGroup && (
+        {isLive && (
           <button className={`btn-ghost ${callOpen ? 'active' : ''}`} onClick={() => setCallOpen((v) => !v)}>
             👥 {callOpen ? 'Hide call' : 'Show call'}
           </button>
@@ -113,7 +144,7 @@ export function RoomPage() {
           a={layout === 'editor-left' ? editorEl : boardEl}
           b={layout === 'editor-left' ? boardEl : editorEl}
         />
-        {isGroup && callOpen && (
+        {isLive && callOpen && (
           <ParticipantsStrip selfName={user?.name || 'You'} call={call} />
         )}
       </div>

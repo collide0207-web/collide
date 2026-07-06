@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import type { User } from '../api/types'
 import { setCollabToken } from '../collab/yjs'
 
-export type StudyMode = 'solo' | 'group'
+export type StudyMode = 'solo' | 'group' | 'interview'
 
 export interface AuthTokens {
   accessToken: string
