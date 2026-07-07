@@ -10,8 +10,6 @@ import { useFileSystem } from './fileSystem'
 interface Props {
   roomId: string
   canEdit: boolean
-  /** Report the focused file up so an interview's question panel can run it. */
-  onActiveFile?: (id: string | null) => void
 }
 
 const LANGUAGES = [
@@ -42,7 +40,7 @@ const THEMES = [
   { id: 'collide-github', label: 'GitHub Light' },
 ]
 
-export function EditorColumn({ roomId, canEdit, onActiveFile }: Props) {
+export function EditorColumn({ roomId, canEdit }: Props) {
   const fs = useFileSystem(roomId)
   const { nodesById, ops } = fs
 
@@ -72,11 +70,6 @@ export function EditorColumn({ roomId, canEdit, onActiveFile }: Props) {
   useLayoutEffect(() => {
     editorRef.current?.layout()
   }, [outputCollapsed])
-
-  // Surface the active file to the parent (interview question panel runs it).
-  useEffect(() => {
-    onActiveFile?.(activeId)
-  }, [activeId, onActiveFile])
 
   const activeNode = activeId ? nodesById.get(activeId) : undefined
   const activePath = activeId ? ops.pathOf(activeId) : ''

@@ -20,11 +20,16 @@ export interface TestCase {
 
 export interface Question {
   id: string
+  /** Short title shown in the navigator + as the heading. */
+  title: string
   /** Prompt shown to the candidate. */
   description: string
-  /** Name of the function the candidate must implement (called by the tests). */
+  /** Name of the function the candidate must implement (referenced by examples). */
   fnName: string
+  /** Example cases shown LeetCode-style (input → expected output). */
   tests: TestCase[]
+  /** Reference images, stored inline as base64 data URLs so they sync via Yjs. */
+  images: string[]
 }
 
 const MAP_KEY = 'interview'

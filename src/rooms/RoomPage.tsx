@@ -32,29 +32,20 @@ export function RoomPage() {
 
   // Access role comes from the invite link (?role=viewer|editor). Viewers get a
   // read-only editor + board; the host and editors can edit. No role param = host.
-  // The role is also sent to the collab server, which enforces it (drops a viewer's
-  // edits) — this UI gate is the matching client-side half + good UX.
   const role = search.get('role')
   const canEdit = role !== 'viewer'
 
-  // The mesh video call — only active in live (group/interview) mode. Owns all local
-  // media. Dev connects anonymously via DEV_ALLOW_ANON (like the Yjs provider): the
-  // mock login token is not a real JWT, so sending it would be rejected. Pass the real
-  // JWT here once the control plane issues them.
+  // The mesh video call — only active in live (group/interview) mode.
   const call = useCall(roomId, undefined, isLive, role ?? undefined)
 
   const [layout, setLayout] = useState<Layout>(
     () => (localStorage.getItem(LAYOUT_KEY) as Layout) || 'editor-left',
   )
-  // Live modes start with the call visible, but it's toggleable.
   const [callOpen, setCallOpen] = useState(true)
   const [addOpen, setAddOpen] = useState(false)
-  // The editor reports its focused file so the question panel can run tests on it.
-  const [activeFileId, setActiveFileId] = useState<string | null>(null)
-  // Whether this interview has questions (drives the Question ↔ Drawing toggle).
   const [hasQuestions, setHasQuestions] = useState(false)
-  // In interview mode, the right pane shows the question by default; toggle to draw.
-  const [showBoard, setShowBoard] = useState(false)
+  // In the LeetCode-style interview layout the right pane toggles editor ↔ board.
+  const [rightPane, setRightPane] = useState<'editor' | 'board'>('editor')
 
   useEffect(() => {
     const name = user?.name || 'Guest'
@@ -76,24 +67,24 @@ export function RoomPage() {
   }
 
   function doLogout() {
-    // useCall's cleanup stops all media + closes peers when RoomPage unmounts.
     logout()
     navigate('/login')
   }
 
-  const editorEl = <EditorColumn roomId={roomId} canEdit={canEdit} onActiveFile={setActiveFileId} />
-
-  // In an interview with questions, the right pane defaults to the question panel
-  // and toggles to the whiteboard. Otherwise it's always the whiteboard.
-  const showQuestion = isInterview && hasQuestions && !showBoard
+  const editorEl = <EditorColumn roomId={roomId} canEdit={canEdit} />
   const boardEl = (
     <div className="board-pane">
-      <span className="pane-label">{showQuestion ? 'QUESTION' : 'NOTES'}</span>
-      {showQuestion ? (
-        <QuestionPanel roomId={roomId} activeFileId={activeFileId} />
-      ) : (
-        <Whiteboard roomId={roomId} readOnly={!canEdit} />
-      )}
+      <span className="pane-label">NOTES</span>
+      <Whiteboard roomId={roomId} readOnly={!canEdit} />
+    </div>
+  )
+
+  // Interviews with questions use a LeetCode-style layout: question always on the
+  // left, and the right side toggles between the code editor and the drawing board.
+  const leetLayout = isInterview && hasQuestions
+  const questionEl = (
+    <div className="board-pane">
+      <QuestionPanel roomId={roomId} />
     </div>
   )
 
@@ -107,15 +98,19 @@ export function RoomPage() {
         {!canEdit && <span className="mode-chip viewer" title="You joined as a viewer">👁 Read-only</span>}
         <span className="spacer" />
 
-        {isInterview && hasQuestions && (
-          <button className="btn-ghost" onClick={() => setShowBoard((v) => !v)} title="Switch the side pane">
-            {showBoard ? '📝 Show question' : '✏️ Show drawing'}
+        {leetLayout ? (
+          <button
+            className="btn-ghost"
+            onClick={() => setRightPane((p) => (p === 'editor' ? 'board' : 'editor'))}
+            title="Switch the right pane between the code editor and the drawing board"
+          >
+            {rightPane === 'editor' ? '✏️ Drawing board' : '💻 Code editor'}
+          </button>
+        ) : (
+          <button className="btn-ghost" onClick={toggleLayout} title="Swap editor / notes sides">
+            ⇄ {layout === 'editor-left' ? 'Editor left' : 'Editor right'}
           </button>
         )}
-
-        <button className="btn-ghost" onClick={toggleLayout} title="Swap editor / notes sides">
-          ⇄ {layout === 'editor-left' ? 'Editor left' : 'Editor right'}
-        </button>
 
         {isLive && (
           <button className={`btn-ghost ${call.sharing ? 'active' : ''}`} onClick={call.toggleScreenShare}>
@@ -139,11 +134,15 @@ export function RoomPage() {
       </div>
 
       <div className="workspace">
-        <SplitPane
-          storageKey="collide-split"
-          a={layout === 'editor-left' ? editorEl : boardEl}
-          b={layout === 'editor-left' ? boardEl : editorEl}
-        />
+        {leetLayout ? (
+          <SplitPane storageKey="collide-split-leet" a={questionEl} b={rightPane === 'editor' ? editorEl : boardEl} />
+        ) : (
+          <SplitPane
+            storageKey="collide-split"
+            a={layout === 'editor-left' ? editorEl : boardEl}
+            b={layout === 'editor-left' ? boardEl : editorEl}
+          />
+        )}
         {isLive && callOpen && (
           <ParticipantsStrip selfName={user?.name || 'You'} call={call} />
         )}
