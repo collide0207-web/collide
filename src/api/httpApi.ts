@@ -1,4 +1,4 @@
-import type { Api, AuthResult, Member, Role, Room, ShareLink, SignupInput, User } from './types'
+import type { Api, AuthResult, InterviewQuestion, Member, Role, Room, RoomMode, ShareLink, SignupInput, User } from './types'
 import { useSession } from '../store/session'
 
 /**
@@ -188,8 +188,8 @@ export const httpApi: Api = {
   },
 
   // --- rooms ---
-  async createRoom(name) {
-    const r = await authed<RawRoom>('/rooms', { method: 'POST', body: JSON.stringify({ name, mode: 'group' }) })
+  async createRoom(name, mode: RoomMode = 'group') {
+    const r = await authed<RawRoom>('/rooms', { method: 'POST', body: JSON.stringify({ name, mode }) })
     return { id: r.id, name: r.name, ownerId: r.ownerId }
   },
 
@@ -227,5 +227,37 @@ export const httpApi: Api = {
       role: link.role,
       url: `${location.origin}/room/${roomId}?mode=group&role=${role}&t=${link.token}`,
     }
+  },
+
+  // --- interview questions ---
+  async saveInterview(roomId, questions) {
+    await authed<InterviewQuestion[]>(`/rooms/${roomId}/interview`, {
+      method: 'PUT',
+      body: JSON.stringify(questions),
+    })
+  },
+
+  async getInterview(roomId) {
+    return authed<InterviewQuestion[]>(`/rooms/${roomId}/interview`)
+  },
+
+  async uploadInterviewImage(roomId, file) {
+    // Multipart: must NOT set Content-Type (the browser adds the boundary), so this
+    // bypasses jsonInit and does its own token + refresh-retry, mirroring authed().
+    const form = new FormData()
+    form.append('file', file)
+    const send = (t: string | null) =>
+      fetch(`${BASE}/rooms/${roomId}/interview/images`, {
+        method: 'POST',
+        headers: t ? { Authorization: `Bearer ${t}` } : {},
+        body: form,
+      })
+    let res = await send(useSession.getState().accessToken)
+    if (res.status === 401) {
+      const fresh = await refreshAccessToken()
+      if (fresh) res = await send(fresh)
+    }
+    const { id } = await parse<{ id: string }>(res)
+    return { id, url: `${BASE}/rooms/${roomId}/interview/images/${id}` }
   },
 }

@@ -1,37 +1,22 @@
 import { useEffect, useState } from 'react'
-import { observeInterviewQuestions, type Question } from '../collab/interview'
-import { getRoomDoc } from '../collab/yjs'
-import { runTests, type TestOutcome } from '../run/runner'
+import type { InterviewQuestion } from '../api/types'
 
 interface Props {
-  roomId: string
-  /** The file currently focused in the editor — its source is run against tests. */
-  activeFileId: string | null
+  questions: InterviewQuestion[]
 }
 
 /**
- * The interview question surface — shown in place of (and toggleable with) the
- * whiteboard. Reads the interviewer's questions live from Yjs and lets the
- * candidate run the active file against each question's test cases.
+ * Interview question surface — LeetCode-style. A thin sidebar navigator lists
+ * every question; the selected one is shown in detail (title, prompt, reference
+ * images, example cases). Questions are fetched by RoomPage and passed in.
  */
-export function QuestionPanel({ roomId, activeFileId }: Props) {
-  const [questions, setQuestions] = useState<Question[]>([])
-  const [results, setResults] = useState<Record<string, TestOutcome[]>>({})
-  const [running, setRunning] = useState<string | null>(null)
+export function QuestionPanel({ questions }: Props) {
+  const [activeIdx, setActiveIdx] = useState(0)
 
-  useEffect(() => observeInterviewQuestions(roomId, setQuestions), [roomId])
-
-  async function run(q: Question) {
-    if (!activeFileId) {
-      setResults((r) => ({ ...r, [q.id]: [] }))
-      return
-    }
-    setRunning(q.id)
-    const source = getRoomDoc(roomId).doc.getText(`file:${activeFileId}`).toString()
-    const outcomes = await runTests(source, q.fnName, q.tests)
-    setResults((r) => ({ ...r, [q.id]: outcomes }))
-    setRunning(null)
-  }
+  // Keep the selection valid if the question set changes under us.
+  useEffect(() => {
+    if (activeIdx >= questions.length && questions.length > 0) setActiveIdx(questions.length - 1)
+  }, [questions.length, activeIdx])
 
   if (questions.length === 0) {
     return (
@@ -41,64 +26,51 @@ export function QuestionPanel({ roomId, activeFileId }: Props) {
     )
   }
 
-  return (
-    <div className="q-panel">
-      {questions.map((q, i) => {
-        const outcomes = results[q.id]
-        const passed = outcomes?.filter((o) => o.passed).length ?? 0
-        return (
-          <div key={q.id} className="q-card">
-            <div className="q-card-head">
-              <span className="q-num">Question {i + 1}</span>
-              {q.tests.length > 0 && (
-                <button
-                  className="run-btn"
-                  disabled={running === q.id || !activeFileId}
-                  onClick={() => run(q)}
-                  title={activeFileId ? 'Run your code against the tests' : 'Open a file first'}
-                >
-                  {running === q.id ? 'Running…' : '▶ Run tests'}
-                </button>
-              )}
-            </div>
-            <p className="q-desc">{q.description}</p>
-            {q.fnName && (
-              <p className="q-fn">
-                Implement <code>{q.fnName}(…)</code>
-              </p>
-            )}
+  const q = questions[Math.min(activeIdx, questions.length - 1)]
 
-            {q.tests.length > 0 && (
-              <div className="q-tests">
-                {outcomes && (
-                  <div className={`q-summary ${passed === outcomes.length ? 'ok' : 'fail'}`}>
-                    {passed}/{outcomes.length} passed
-                  </div>
-                )}
-                {(outcomes ?? q.tests.map((t) => ({ ...t, actual: '', passed: false }))).map(
-                  (t, ti) => {
-                    const done = !!outcomes
-                    return (
-                      <div
-                        key={ti}
-                        className={`q-test ${done ? (t.passed ? 'pass' : 'fail') : ''}`}
-                      >
-                        <span className="q-test-mark">{done ? (t.passed ? '✓' : '✗') : '•'}</span>
-                        <code className="q-test-io">{t.args || '()'} → {t.expected}</code>
-                        {done && !t.passed && (
-                          <span className="q-test-actual">
-                            got {'error' in t && t.error ? t.error : t.actual}
-                          </span>
-                        )}
-                      </div>
-                    )
-                  },
-                )}
-              </div>
-            )}
+  return (
+    <div className="q-panel leet">
+      <nav className="q-nav" aria-label="Questions">
+        {questions.map((item, i) => (
+          <button
+            key={item.id}
+            className={`q-nav-item ${i === activeIdx ? 'active' : ''}`}
+            onClick={() => setActiveIdx(i)}
+            title={item.title || `Question ${i + 1}`}
+          >
+            {i + 1}
+          </button>
+        ))}
+      </nav>
+
+      <div className="q-detail">
+        <h2 className="q-title">{q.title || `Question ${activeIdx + 1}`}</h2>
+        <p className="q-desc">{q.description}</p>
+
+        {q.images.length > 0 && (
+          <div className="q-images">
+            {q.images.map((src, i) => (
+              <img key={i} src={src} alt={`Reference ${i + 1}`} className="q-image" />
+            ))}
           </div>
-        )
-      })}
+        )}
+
+        {q.fnName && (
+          <p className="q-fn">Implement <code>{q.fnName}(…)</code></p>
+        )}
+
+        {q.tests.length > 0 && (
+          <div className="q-examples">
+            {q.tests.map((t, i) => (
+              <div key={i} className="q-example">
+                <span className="q-example-label">Example {i + 1}</span>
+                <div className="q-example-row"><span>Input</span><code>{t.args || '()'}</code></div>
+                <div className="q-example-row"><span>Output</span><code>{t.expected}</code></div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

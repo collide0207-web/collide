@@ -33,6 +33,24 @@ export interface Room {
   ownerId: string
 }
 
+export type RoomMode = 'solo' | 'group' | 'interview'
+
+/** One example case: candidate implements `fnName`, called with `args` → `expected`. */
+export interface InterviewTestCase {
+  args: string
+  expected: string
+}
+
+export interface InterviewQuestion {
+  id: string
+  title: string
+  description: string
+  fnName: string
+  tests: InterviewTestCase[]
+  /** Reference image URLs (served by the control plane). */
+  images: string[]
+}
+
 export interface ShareLink {
   token: string
   role: Role
@@ -67,7 +85,7 @@ export interface Api {
   me(): Promise<User>
 
   // --- rooms ---
-  createRoom(name: string): Promise<Room>
+  createRoom(name: string, mode?: RoomMode): Promise<Room>
   getRoom(roomId: string): Promise<Room>
 
   // --- members & roles (owner-managed) ---
@@ -77,4 +95,12 @@ export interface Api {
 
   // --- share links ---
   createShareLink(roomId: string, role: Role): Promise<ShareLink>
+
+  // --- interview questions ---
+  /** Save/replace the room's question set (interviewer only). */
+  saveInterview(roomId: string, questions: InterviewQuestion[]): Promise<void>
+  /** Fetch the room's question set (empty if none). */
+  getInterview(roomId: string): Promise<InterviewQuestion[]>
+  /** Upload a reference image; returns its id and a loadable URL. */
+  uploadInterviewImage(roomId: string, file: File): Promise<{ id: string; url: string }>
 }

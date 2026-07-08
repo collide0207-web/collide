@@ -1,36 +1,21 @@
-import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { useSession, type StudyMode } from '../store/session'
-import { InterviewSetup } from './InterviewSetup'
-import { setInterviewQuestions, type Question } from '../collab/interview'
 
 export function ModeSelect() {
   const navigate = useNavigate()
   const user = useSession((s) => s.user)
   const setMode = useSession((s) => s.setMode)
   const logout = useSession((s) => s.logout)
-  const [showSetup, setShowSetup] = useState(false)
 
   if (!user) {
     navigate('/login')
     return null
   }
 
-  const roomName: Record<StudyMode, string> = {
-    solo: 'Solo session',
-    group: 'Group session',
-    interview: 'Interview session',
-  }
-
-  async function enter(mode: StudyMode, questions?: Question[]) {
+  async function enter(mode: Exclude<StudyMode, 'interview'>) {
     setMode(mode)
-    const room = await api.createRoom(roomName[mode])
-    // Seed the interviewer's questions into the room's shared doc before entering,
-    // so the candidate sees them the moment they join.
-    if (mode === 'interview' && questions && questions.length) {
-      setInterviewQuestions(room.id, questions)
-    }
+    const room = await api.createRoom(mode === 'solo' ? 'Solo session' : 'Group session')
     navigate(`/room/${room.id}?mode=${mode}`)
   }
 
@@ -62,21 +47,14 @@ export function ModeSelect() {
             <span className="mode-cta">Start a room →</span>
           </button>
 
-          <button className="mode-card interview" onClick={() => setShowSetup(true)}>
+          <button className="mode-card interview" onClick={() => navigate('/interview/setup')}>
             <div className="mode-icon">🎯</div>
             <h3>Interview</h3>
-            <p>Set up coding questions with runnable test cases, then interview live over video.</p>
+            <p>Set up coding questions with reference images and examples, then interview live over video.</p>
             <span className="mode-cta">Set up interview →</span>
           </button>
         </div>
       </div>
-
-      {showSetup && (
-        <InterviewSetup
-          onCancel={() => setShowSetup(false)}
-          onStart={(questions) => enter('interview', questions)}
-        />
-      )}
     </div>
   )
 }
