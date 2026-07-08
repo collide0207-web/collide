@@ -39,8 +39,13 @@ export function RoomPage() {
   // The mesh video call — only active in live (group/interview) mode.
   const call = useCall(roomId, undefined, isLive, role ?? undefined)
 
+  // Interview rooms show the question pane on the left by default, so they keep
+  // their own saved layout preference instead of the shared one.
+  const layoutKey = isInterview ? `${LAYOUT_KEY}-interview` : LAYOUT_KEY
   const [layout, setLayout] = useState<Layout>(
-    () => (localStorage.getItem(LAYOUT_KEY) as Layout) || 'editor-left',
+    () =>
+      (localStorage.getItem(layoutKey) as Layout) ||
+      (isInterview ? 'editor-right' : 'editor-left'),
   )
   const [callOpen, setCallOpen] = useState(true)
   const [addOpen, setAddOpen] = useState(false)
@@ -65,7 +70,7 @@ export function RoomPage() {
   function toggleLayout() {
     setLayout((l) => {
       const next = l === 'editor-left' ? 'editor-right' : 'editor-left'
-      localStorage.setItem(LAYOUT_KEY, next)
+      localStorage.setItem(layoutKey, next)
       return next
     })
   }
@@ -75,7 +80,8 @@ export function RoomPage() {
     navigate('/login')
   }
 
-  const editorEl = <EditorColumn roomId={roomId} canEdit={canEdit} />
+  // Interviews focus on the seeded file — no file explorer (LeetCode-style).
+  const editorEl = <EditorColumn roomId={roomId} canEdit={canEdit} showExplorer={!isInterview} />
   const boardEl = (
     <div className="board-pane">
       <span className="pane-label">NOTES</span>
