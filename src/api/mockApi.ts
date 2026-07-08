@@ -1,4 +1,4 @@
-import type { Api, AuthResult, Member, Role, Room, ShareLink, SignupInput, User } from './types'
+import type { Api, AuthResult, InterviewQuestion, Member, Role, Room, ShareLink, SignupInput, User } from './types'
 
 /**
  * In-memory + localStorage mock of the backend. Stands in for local UI work when
@@ -13,6 +13,7 @@ const USER_KEY = 'collab-ide-mock-user'
 interface Store {
   rooms: Record<string, Room>
   members: Record<string, Member[]>
+  interview?: Record<string, InterviewQuestion[]>
 }
 
 function load(): Store {
@@ -111,6 +112,7 @@ export const mockApi: Api = {
   async createRoom(name) {
     const s = load()
     const ownerId = 'me'
+    // mode isn't persisted in the mock Room shape; the SPA carries it in the URL.
     const room: Room = { id: nextId('r'), name, ownerId }
     s.rooms[room.id] = room
     s.members[room.id] = [
@@ -157,5 +159,28 @@ export const mockApi: Api = {
       role,
       url: `${location.origin}/room/${roomId}?mode=group&role=${role}&t=${token}`,
     }
+  },
+
+  // --- interview questions ---
+  async saveInterview(roomId, questions) {
+    const s = load()
+    s.interview = s.interview || {}
+    s.interview[roomId] = questions
+    save(s)
+  },
+
+  async getInterview(roomId) {
+    return load().interview?.[roomId] || []
+  },
+
+  async uploadInterviewImage(_roomId, file) {
+    // No server to store bytes — inline the image as a data URL so <img> still works.
+    const url = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = () => reject(reader.error)
+      reader.readAsDataURL(file)
+    })
+    return { id: nextId('img'), url }
   },
 }

@@ -1,20 +1,17 @@
 import { useEffect, useState } from 'react'
-import { observeInterviewQuestions, type Question } from '../collab/interview'
+import type { InterviewQuestion } from '../api/types'
 
 interface Props {
-  roomId: string
+  questions: InterviewQuestion[]
 }
 
 /**
  * Interview question surface — LeetCode-style. A thin sidebar navigator lists
  * every question; the selected one is shown in detail (title, prompt, reference
- * images, example cases). Questions are read live from the shared Yjs doc.
+ * images, example cases). Questions are fetched by RoomPage and passed in.
  */
-export function QuestionPanel({ roomId }: Props) {
-  const [questions, setQuestions] = useState<Question[]>([])
+export function QuestionPanel({ questions }: Props) {
   const [activeIdx, setActiveIdx] = useState(0)
-
-  useEffect(() => observeInterviewQuestions(roomId, setQuestions), [roomId])
 
   // Keep the selection valid if the question set changes under us.
   useEffect(() => {

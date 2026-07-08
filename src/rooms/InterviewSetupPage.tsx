@@ -2,15 +2,29 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { useSession } from '../store/session'
-import { setInterviewQuestions, type Question, type TestCase } from '../collab/interview'
+import type { InterviewQuestion, InterviewTestCase } from '../api/types'
+
+// Draft shapes for authoring — images are held as File objects (with a preview URL)
+// until submit, when they're uploaded and replaced by their served URLs.
+interface DraftImage {
+  file: File
+  preview: string
+}
+interface DraftQuestion {
+  id: string
+  title: string
+  description: string
+  fnName: string
+  tests: InterviewTestCase[]
+  images: DraftImage[]
+}
 
 let seq = 0
 const uid = () => `q${Date.now().toString(36)}-${seq++}`
-const blankTest = (): TestCase => ({ args: '', expected: '' })
-const blankQuestion = (): Question => ({ id: uid(), title: '', description: '', fnName: '', tests: [blankTest()], images: [] })
+const blankTest = (): InterviewTestCase => ({ args: '', expected: '' })
+const blankQuestion = (): DraftQuestion => ({ id: uid(), title: '', description: '', fnName: '', tests: [blankTest()], images: [] })
 
-// Keep images small — they're inlined as base64 into the Yjs doc that syncs to
-// every participant, so a few MB per image would bloat the whole document.
+// Images are uploaded to the control plane, but keep them modest anyway.
 const MAX_IMAGE_BYTES = 1_500_000
 
 type QErrors = { title?: string; description?: string; fnName?: string; tests: (string | undefined)[] }
@@ -19,7 +33,8 @@ type QErrors = { title?: string; description?: string; fnName?: string; tests: (
  * Full-page, interviewer-only setup shown before the room loads (route
  * /interview/setup). A master toggle decides whether the session has questions;
  * when on, the interviewer authors questions with a title, prompt, reference
- * images, a function name and example cases. Validated before the room is created.
+ * images, a function name and example cases. On submit the room is created, images
+ * are uploaded, and the question set is saved to the backend.
  */
 export function InterviewSetupPage() {
   const navigate = useNavigate()
@@ -27,7 +42,7 @@ export function InterviewSetupPage() {
   const setMode = useSession((s) => s.setMode)
 
   const [enabled, setEnabled] = useState(true)
-  const [questions, setQuestions] = useState<Question[]>([blankQuestion()])
+  const [questions, setQuestions] = useState<DraftQuestion[]>([blankQuestion()])
   const [errors, setErrors] = useState<Record<string, QErrors>>({})
   const [formError, setFormError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -37,10 +52,10 @@ export function InterviewSetupPage() {
     return null
   }
 
-  function patch(id: string, next: Partial<Question>) {
+  function patch(id: string, next: Partial<DraftQuestion>) {
     setQuestions((qs) => qs.map((q) => (q.id === id ? { ...q, ...next } : q)))
   }
-  function patchTest(qid: string, idx: number, next: Partial<TestCase>) {
+  function patchTest(qid: string, idx: number, next: Partial<InterviewTestCase>) {
     setQuestions((qs) =>
       qs.map((q) =>
         q.id === qid ? { ...q, tests: q.tests.map((t, i) => (i === idx ? { ...t, ...next } : t)) } : q,
@@ -48,11 +63,11 @@ export function InterviewSetupPage() {
     )
   }
 
-  async function addImages(qid: string, files: FileList | null) {
+  function addImages(qid: string, files: FileList | null) {
     if (!files?.length) return
     const q = questions.find((x) => x.id === qid)
     if (!q) return
-    const loaded: string[] = []
+    const loaded: DraftImage[] = []
     for (const file of Array.from(files)) {
       if (!file.type.startsWith('image/')) {
         setFormError(`"${file.name}" is not an image.`)
@@ -62,21 +77,19 @@ export function InterviewSetupPage() {
         setFormError(`"${file.name}" is larger than 1.5 MB — please use a smaller image.`)
         continue
       }
-      loaded.push(await readAsDataURL(file))
+      loaded.push({ file, preview: URL.createObjectURL(file) })
     }
     if (loaded.length) patch(qid, { images: [...q.images, ...loaded] })
   }
 
   function validate(): boolean {
     if (!enabled) return true
-    const next: Record<string, QErrors> = {}
-    let ok = true
-
     if (questions.length === 0) {
       setFormError('Add at least one question, or switch questions off.')
       return false
     }
-
+    const next: Record<string, QErrors> = {}
+    let ok = true
     for (const q of questions) {
       const qe: QErrors = { tests: q.tests.map(() => undefined) }
       if (!q.title.trim()) { qe.title = 'Title is required.'; ok = false }
@@ -90,7 +103,7 @@ export function InterviewSetupPage() {
       q.tests.forEach((t, i) => {
         const hasArgs = t.args.trim() !== ''
         const hasExp = t.expected.trim() !== ''
-        if (!hasArgs && !hasExp) return // empty row is dropped, not an error
+        if (!hasArgs && !hasExp) return
         if (!hasArgs || !hasExp) { qe.tests[i] = 'Both input and expected output are required.'; ok = false; return }
         const argErr = validateJson(t.args, true)
         const expErr = validateJson(t.expected, false)
@@ -98,7 +111,6 @@ export function InterviewSetupPage() {
       })
       next[q.id] = qe
     }
-
     setErrors(next)
     setFormError(ok ? null : 'Please fix the highlighted fields.')
     return ok
@@ -110,13 +122,25 @@ export function InterviewSetupPage() {
     setSubmitting(true)
     try {
       setMode('interview')
-      const room = await api.createRoom('Interview session')
+      const room = await api.createRoom('Interview session', 'interview')
       if (enabled) {
-        const cleaned = questions.map((q) => ({
-          ...q,
-          tests: q.tests.filter((t) => t.args.trim() || t.expected.trim()),
-        }))
-        setInterviewQuestions(room.id, cleaned)
+        const finalQuestions: InterviewQuestion[] = []
+        for (const q of questions) {
+          const imageUrls: string[] = []
+          for (const img of q.images) {
+            const { url } = await api.uploadInterviewImage(room.id, img.file)
+            imageUrls.push(url)
+          }
+          finalQuestions.push({
+            id: q.id,
+            title: q.title.trim(),
+            description: q.description.trim(),
+            fnName: q.fnName.trim(),
+            tests: q.tests.filter((t) => t.args.trim() || t.expected.trim()),
+            images: imageUrls,
+          })
+        }
+        await api.saveInterview(room.id, finalQuestions)
       }
       navigate(`/room/${room.id}?mode=interview`)
     } catch {
@@ -188,9 +212,9 @@ export function InterviewSetupPage() {
                       <div className="iv-tests-head"><span>Images</span><span className="iv-hint">optional · ≤ 1.5 MB each</span></div>
                       {q.images.length > 0 && (
                         <div className="iv-thumbs">
-                          {q.images.map((src, ii) => (
+                          {q.images.map((img, ii) => (
                             <div key={ii} className="iv-thumb">
-                              <img src={src} alt={`Question ${qi + 1} reference ${ii + 1}`} />
+                              <img src={img.preview} alt={`Question ${qi + 1} reference ${ii + 1}`} />
                               <button className="iv-remove" onClick={() => patch(q.id, { images: q.images.filter((_, i) => i !== ii) })} title="Remove image">×</button>
                             </div>
                           ))}
@@ -240,15 +264,6 @@ export function InterviewSetupPage() {
       </div>
     </div>
   )
-}
-
-function readAsDataURL(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(reader.result as string)
-    reader.onerror = () => reject(reader.error)
-    reader.readAsDataURL(file)
-  })
 }
 
 /** Validate a JSON string; args must parse to an array. Returns an error message or undefined. */

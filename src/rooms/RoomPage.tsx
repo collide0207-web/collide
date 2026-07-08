@@ -9,7 +9,8 @@ import { SplitPane } from '../layout/SplitPane'
 import { ScreenIcon, AddPersonIcon } from '../video/icons'
 import { AddMembersDialog } from './AddMembersDialog'
 import { setPresence } from '../collab/yjs'
-import { observeInterviewQuestions } from '../collab/interview'
+import { api } from '../api'
+import type { InterviewQuestion } from '../api/types'
 import { useSession, type StudyMode } from '../store/session'
 
 const COLORS = ['#5b8cff', '#ff6b8b', '#3dd68c', '#ffcf5c', '#c084fc']
@@ -43,9 +44,10 @@ export function RoomPage() {
   )
   const [callOpen, setCallOpen] = useState(true)
   const [addOpen, setAddOpen] = useState(false)
-  const [hasQuestions, setHasQuestions] = useState(false)
+  const [questions, setQuestions] = useState<InterviewQuestion[]>([])
   // In the LeetCode-style interview layout the right pane toggles editor ↔ board.
   const [rightPane, setRightPane] = useState<'editor' | 'board'>('editor')
+  const hasQuestions = questions.length > 0
 
   useEffect(() => {
     const name = user?.name || 'Guest'
@@ -55,7 +57,9 @@ export function RoomPage() {
 
   useEffect(() => {
     if (!isInterview) return
-    return observeInterviewQuestions(roomId, (qs) => setHasQuestions(qs.length > 0))
+    let live = true
+    api.getInterview(roomId).then((qs) => { if (live) setQuestions(qs) }).catch(() => {})
+    return () => { live = false }
   }, [roomId, isInterview])
 
   function toggleLayout() {
@@ -84,7 +88,7 @@ export function RoomPage() {
   const leetLayout = isInterview && hasQuestions
   const questionEl = (
     <div className="board-pane">
-      <QuestionPanel roomId={roomId} />
+      <QuestionPanel questions={questions} />
     </div>
   )
 
