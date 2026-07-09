@@ -93,6 +93,70 @@ export interface ExecutionResult {
   stderrTruncated: boolean
 }
 
+// --- coding-practice problems (NeetCode 150) ---
+
+export type Difficulty = 'easy' | 'medium' | 'hard'
+export type ProblemStatus = 'unsolved' | 'attempted' | 'solved'
+
+export interface ProblemSummary {
+  id: string
+  slug: string
+  title: string
+  difficulty: Difficulty
+  category: string
+  tags: string[]
+  order: number
+  /** Whether we host an original statement (vs. metadata-only, link-out). */
+  hasStatement: boolean
+}
+
+export interface ProblemExample {
+  input: string
+  output: string
+  explanation?: string
+}
+
+export interface ProblemDetail {
+  id: string
+  slug: string
+  title: string
+  difficulty: Difficulty
+  category: string
+  tags: string[]
+  description: string | null
+  examples: ProblemExample[] | null
+  constraints: string | null
+  sourceUrl: string | null
+  /** language → starter code. */
+  starterCode: Record<string, string>
+  supportedLanguages: string[]
+}
+
+export interface UserProgress {
+  problemId: string
+  status: ProblemStatus
+  language: string | null
+  /** language → last saved source (per-language work preserved). */
+  code: Record<string, string>
+  favorite: boolean
+  completed: boolean
+  timeSpent: number
+  attemptCount: number
+  runCount: number
+  lastOpened: string | null
+  updatedAt: string | null
+}
+
+export interface ProgressUpdate {
+  status?: ProblemStatus
+  language?: string
+  code?: Record<string, string>
+  completed?: boolean
+  bumpRun?: boolean
+  bumpAttempt?: boolean
+  timeSpentInc?: number
+}
+
 export interface Api {
   // --- auth ---
   signup(input: SignupInput): Promise<AuthResult>
@@ -131,4 +195,14 @@ export interface Api {
   getExecutionStatus(executionId: string): Promise<ExecutionSubmission>
   getExecutionResult(executionId: string): Promise<ExecutionResult>
   cancelExecution(executionId: string): Promise<void>
+
+  // --- problems & progress (NeetCode 150) ---
+  getProblems(sheet?: string): Promise<ProblemSummary[]>
+  getProblem(slug: string): Promise<ProblemDetail>
+  getProblemCategories(sheet?: string): Promise<string[]>
+  /** All of the current user's progress rows (for the sheet + dashboard). */
+  getAllProgress(): Promise<UserProgress[]>
+  getProblemProgress(problemId: string): Promise<UserProgress>
+  updateProgress(problemId: string, patch: ProgressUpdate): Promise<UserProgress>
+  setFavorite(problemId: string, favorite: boolean): Promise<UserProgress>
 }

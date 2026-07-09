@@ -53,6 +53,13 @@ export function ModeSelect() {
             <p>Set up coding questions with reference images and examples, then interview live over video.</p>
             <span className="mode-cta">Set up interview →</span>
           </button>
+
+          <button className="mode-card practice" onClick={() => navigate('/dashboard')}>
+            <div className="mode-icon">🧩</div>
+            <h3>Practice</h3>
+            <p>Grind the NeetCode 150. Browse by topic, solve in the editor, and track your progress.</p>
+            <span className="mode-cta">Open dashboard →</span>
+          </button>
         </div>
       </div>
     </div>
