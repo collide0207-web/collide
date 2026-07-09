@@ -3,3 +3,8 @@ dist
 .DS_Store
 *.local
 *.tsbuildinfo
+
+# Local env overrides (do not commit)
+.env
+.env.local
+.env.*.local
