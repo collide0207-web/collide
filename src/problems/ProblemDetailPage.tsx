@@ -4,13 +4,14 @@ import Editor, { type OnMount } from '@monaco-editor/react'
 import { api } from '../api'
 import { SplitPane } from '../layout/SplitPane'
 import { BottomPanel } from '../run/BottomPanel'
-import { runCode, type RunResult } from '../run/runner'
-import type { ProblemDetail, UserProgress } from '../api/types'
+import { runCode, type RunHandle, type RunUpdate } from '../run/runner'
+import type { ExecutionStatus, ProblemDetail, UserProgress } from '../api/types'
 
 const LANG_LABEL: Record<string, string> = {
   javascript: 'JavaScript', python: 'Python', java: 'Java', cpp: 'C++',
 }
 const AUTOSAVE_MS = 1500
+const TERMINAL: ExecutionStatus[] = ['COMPLETED', 'FAILED', 'TIMEOUT', 'CANCELLED']
 
 /**
  * LeetCode-style problem workspace: statement on the left, Monaco editor + output
@@ -34,10 +35,11 @@ export function ProblemDetailPage() {
   )
 
   const [running, setRunning] = useState(false)
-  const [result, setResult] = useState<RunResult | null>(null)
+  const [result, setResult] = useState<RunUpdate | null>(null)
   const [outputCollapsed, setOutputCollapsed] = useState(false)
 
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null)
+  const runHandleRef = useRef<RunHandle | null>(null)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const codeRef = useRef<Record<string, string>>({})
   const langRef = useRef(language)
@@ -93,6 +95,7 @@ export function ProblemDetailPage() {
       window.removeEventListener('pagehide', flush)
       window.removeEventListener('beforeunload', flush)
       if (saveTimer.current) { clearTimeout(saveTimer.current); save() }
+      runHandleRef.current?.cancel()
     }
   }, [save])
 
@@ -115,17 +118,23 @@ export function ProblemDetailPage() {
     save()
   }
 
-  async function onRun() {
-    if (!problem) return
+  function onRun() {
+    if (!problem || running) return
     setRunning(true)
+    setResult(null)
     setOutputCollapsed(false)
-    if (language === 'javascript') {
-      setResult(await runCode(codeByLang[language] ?? ''))
-    } else {
-      setResult({ lines: [`(In-browser preview runs JavaScript only. ${LANG_LABEL[language]} execution arrives with the backend sandbox.)`] })
-    }
-    setRunning(false)
+    // Streams live output via the shared runner (backend execution engine, or the
+    // mock's in-browser JS fallback). Works the same for every language.
+    runHandleRef.current = runCode(language, codeByLang[language] ?? '', undefined, (update) => {
+      setResult(update)
+      if (TERMINAL.includes(update.status)) setRunning(false)
+    })
     save({ bumpRun: true })
+  }
+
+  function onStop() {
+    runHandleRef.current?.cancel()
+    setRunning(false)
   }
 
   function resetCode() {
@@ -229,6 +238,7 @@ export function ProblemDetailPage() {
         <button className="btn-ghost" onClick={copyCode} title="Copy code">Copy</button>
         <span className="spacer" />
         <button className="btn-ghost" disabled title="Submit — coming with the execution engine">Submit</button>
+        {running && <button className="btn-ghost" onClick={onStop} title="Stop">■ Stop</button>}
         <button className="run-btn" onClick={onRun} disabled={running} title="Run (Ctrl+Enter)">
           {running ? 'Running…' : '▶ Run'}
         </button>

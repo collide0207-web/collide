@@ -61,6 +61,20 @@ async function parse<T>(res: Response): Promise<T> {
   return (env && typeof env === 'object' && 'data' in env ? env.data : (body as T)) as T
 }
 
+/** Coerce a JSONB field to a string[] — tolerates arrays, null, or a JSON-string. */
+function asStringArray(v: unknown): string[] {
+  if (Array.isArray(v)) return v.map((x) => String(x))
+  if (typeof v === 'string' && v.trim()) {
+    try {
+      const parsed = JSON.parse(v)
+      return Array.isArray(parsed) ? parsed.map((x) => String(x)) : []
+    } catch {
+      return []
+    }
+  }
+  return []
+}
+
 function jsonInit(init?: RequestInit, token?: string | null): RequestInit {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   if (init?.headers) Object.assign(headers, init.headers)
@@ -296,11 +310,21 @@ export const httpApi: Api = {
 
   // --- problems & progress ---
   async getProblems(sheet = 'neetcode150') {
-    return authed<ProblemSummary[]>(`/api/problems?sheet=${encodeURIComponent(sheet)}`)
+    const list = await authed<ProblemSummary[]>(`/api/problems?sheet=${encodeURIComponent(sheet)}`)
+    return list.map((p) => ({ ...p, tags: asStringArray(p.tags) }))
   },
 
   async getProblem(slug) {
-    return authed<ProblemDetail>(`/api/problems/${encodeURIComponent(slug)}`)
+    const p = await authed<ProblemDetail>(`/api/problems/${encodeURIComponent(slug)}`)
+    // JSONB fields can arrive as arrays, null, or (defensively) a JSON string —
+    // normalize so the UI can always .map/.slice them safely.
+    return {
+      ...p,
+      tags: asStringArray(p.tags),
+      supportedLanguages: asStringArray(p.supportedLanguages),
+      examples: Array.isArray(p.examples) ? p.examples : null,
+      starterCode: p.starterCode && typeof p.starterCode === 'object' ? p.starterCode : {},
+    }
   },
 
   async getProblemCategories(sheet = 'neetcode150') {
