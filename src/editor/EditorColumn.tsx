@@ -3,7 +3,7 @@ import { CodeEditor } from './CodeEditor'
 import { FileTree } from './FileTree'
 import { FileIcon } from './fileIcons'
 import { BottomPanel } from '../run/BottomPanel'
-import { runCode, type RunResult } from '../run/runner'
+import { runCode, type RunHandle, type RunUpdate } from '../run/runner'
 import { languageForPath } from './files'
 import { useFileSystem } from './fileSystem'
 
@@ -59,12 +59,13 @@ export function EditorColumn({ roomId, canEdit, showExplorer = true }: Props) {
       : 'collide-midnight',
   )
   const [running, setRunning] = useState(false)
-  const [result, setResult] = useState<RunResult | null>(null)
+  const [result, setResult] = useState<RunUpdate | null>(null)
   const [outputCollapsed, setOutputCollapsed] = useState(false)
   const [showTree, setShowTree] = useState(true)
   const autoFocusId = useRef<string | null>(null)
   const didInit = useRef(false)
   const editorRef = useRef<{ layout: () => void } | null>(null)
+  const runHandleRef = useRef<RunHandle | null>(null)
 
   // When the Output panel minimizes/restores, the editor's height changes. Force
   // Monaco to relayout SYNCHRONOUSLY (before paint) so the resize is instant with
@@ -140,10 +141,20 @@ export function EditorColumn({ roomId, canEdit, showExplorer = true }: Props) {
     [activeId],
   )
 
-  async function onRun() {
-    if (!canEdit || !activeId) return
+  const TERMINAL_STATUSES = ['COMPLETED', 'FAILED', 'TIMEOUT', 'CANCELLED']
+
+  function onRun() {
+    if (!canEdit || !activeId || running) return
     setRunning(true)
-    setResult(await runCode(ops.readText(activeId)))
+    setResult(null)
+    runHandleRef.current = runCode(language, ops.readText(activeId), undefined, (update) => {
+      setResult(update)
+      if (TERMINAL_STATUSES.includes(update.status)) setRunning(false)
+    })
+  }
+
+  function onStop() {
+    runHandleRef.current?.cancel()
     setRunning(false)
   }
 
@@ -179,6 +190,11 @@ export function EditorColumn({ roomId, canEdit, showExplorer = true }: Props) {
         <button className="run-btn" onClick={onRun} disabled={!canEdit || running || !activeId}>
           {running ? 'Running…' : '▶ Run'}
         </button>
+        {running && (
+          <button className="run-btn stop-btn" onClick={onStop} title="Stop execution">
+            ■ Stop
+          </button>
+        )}
       </div>
 
       <div className="editor-main">

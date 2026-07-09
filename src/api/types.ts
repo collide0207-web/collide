@@ -73,6 +73,26 @@ export interface SignupInput {
   password: string
 }
 
+/** Lifecycle of one code execution — mirrors the control plane's ExecutionStatus enum. */
+export type ExecutionStatus = 'PENDING' | 'COMPILING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'TIMEOUT' | 'CANCELLED'
+
+export interface ExecutionSubmission {
+  executionId: string
+  status: ExecutionStatus
+}
+
+export interface ExecutionResult {
+  executionId: string
+  language: string
+  status: ExecutionStatus
+  stdout: string | null
+  stderr: string | null
+  exitCode: number | null
+  executionTimeMs: number
+  stdoutTruncated: boolean
+  stderrTruncated: boolean
+}
+
 export interface Api {
   // --- auth ---
   signup(input: SignupInput): Promise<AuthResult>
@@ -103,4 +123,12 @@ export interface Api {
   getInterview(roomId: string): Promise<InterviewQuestion[]>
   /** Upload a reference image; returns its id and a loadable URL. */
   uploadInterviewImage(roomId: string, file: File): Promise<{ id: string; url: string }>
+
+  // --- code execution ---
+  /** Submit code for execution. Returns immediately with a PENDING id — poll
+   * getExecutionStatus/getExecutionResult, or stream via runCode() in src/run/runner.ts. */
+  execute(language: string, sourceCode: string, stdin?: string): Promise<ExecutionSubmission>
+  getExecutionStatus(executionId: string): Promise<ExecutionSubmission>
+  getExecutionResult(executionId: string): Promise<ExecutionResult>
+  cancelExecution(executionId: string): Promise<void>
 }

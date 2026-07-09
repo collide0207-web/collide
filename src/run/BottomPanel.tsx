@@ -1,11 +1,21 @@
-import type { RunResult } from './runner'
+import type { RunUpdate } from './runner'
 
 interface Props {
-  result: RunResult | null
+  result: RunUpdate | null
   running: boolean
   /** Minimized state is owned by the parent so it can relayout the editor instantly. */
   collapsed: boolean
   onToggle: () => void
+}
+
+const STATUS_LABEL: Record<string, string> = {
+  PENDING: 'queued…',
+  COMPILING: 'compiling…',
+  RUNNING: 'running…',
+  COMPLETED: 'finished',
+  FAILED: 'failed',
+  TIMEOUT: 'timed out',
+  CANCELLED: 'cancelled',
 }
 
 export function BottomPanel({ result, running, collapsed, onToggle }: Props) {
@@ -16,6 +26,7 @@ export function BottomPanel({ result, running, collapsed, onToggle }: Props) {
         <button className="tab active" onClick={() => collapsed && onToggle()}>
           Output
         </button>
+        {result && <span className={`run-status run-status-${result.status.toLowerCase()}`}>{STATUS_LABEL[result.status] ?? result.status}</span>}
         <span className="panel-spacer" />
         <button
           className="panel-action"
@@ -30,12 +41,14 @@ export function BottomPanel({ result, running, collapsed, onToggle }: Props) {
       {!collapsed && (
         <div className="panel-body">
           <pre className="output">
-            {running && 'running…\n'}
-            {result?.lines.join('\n')}
-            {result?.error && <span className="err">{'\n' + result.error}</span>}
-            {result && !running && result.lines.length === 0 && !result.error &&
-              '(code ran — no console.log output. Add console.log(...) to see results.)'}
-            {!running && !result && 'Press Run to execute. (client-side preview — backend later)'}
+            {!running && !result && 'Press Run to execute.'}
+            {result?.stdout}
+            {result?.stderr && <span className="err">{(result.stdout ? '\n' : '') + result.stderr}</span>}
+            {result && !running && !result.stdout && !result.stderr &&
+              '(program ran with no output)'}
+            {result?.exitCode !== undefined && result.exitCode !== 0 && (
+              <span className="err">{`\n(exit code ${result.exitCode})`}</span>
+            )}
           </pre>
         </div>
       )}

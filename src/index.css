@@ -410,6 +410,12 @@ select {
 }
 .run-btn:hover { filter: brightness(1.06); }
 .run-btn:active { transform: translateY(0.5px); }
+.run-btn.stop-btn { background: var(--danger); color: #fff; }
+
+.run-status { font-size: 11.5px; font-weight: 650; color: var(--muted); text-transform: uppercase; letter-spacing: 0.02em; margin-left: 8px; }
+.run-status-failed, .run-status-timeout { color: var(--danger); }
+.run-status-completed { color: var(--ok); }
+.run-status-cancelled { color: var(--warn); }
 
 .editor-main { flex: 1; display: flex; min-height: 0; }
 .editor-stack { flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: 0; }

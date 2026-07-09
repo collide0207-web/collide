@@ -1,4 +1,17 @@
-import type { Api, AuthResult, InterviewQuestion, Member, Role, Room, RoomMode, ShareLink, SignupInput, User } from './types'
+import type {
+  Api,
+  AuthResult,
+  ExecutionResult,
+  ExecutionSubmission,
+  InterviewQuestion,
+  Member,
+  Role,
+  Room,
+  RoomMode,
+  ShareLink,
+  SignupInput,
+  User,
+} from './types'
 import { useSession } from '../store/session'
 
 /**
@@ -259,5 +272,25 @@ export const httpApi: Api = {
     }
     const { id } = await parse<{ id: string }>(res)
     return { id, url: `${BASE}/rooms/${roomId}/interview/images/${id}` }
+  },
+
+  // --- code execution ---
+  async execute(language, sourceCode, stdin) {
+    return authed<ExecutionSubmission>('/execute', {
+      method: 'POST',
+      body: JSON.stringify({ language, sourceCode, stdin }),
+    })
+  },
+
+  async getExecutionStatus(executionId) {
+    return authed<ExecutionSubmission>(`/status/${executionId}`)
+  },
+
+  async getExecutionResult(executionId) {
+    return authed<ExecutionResult>(`/result/${executionId}`)
+  },
+
+  async cancelExecution(executionId) {
+    await authed<void>(`/cancel/${executionId}`, { method: 'POST' })
   },
 }

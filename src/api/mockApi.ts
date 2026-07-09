@@ -1,4 +1,16 @@
-import type { Api, AuthResult, InterviewQuestion, Member, Role, Room, ShareLink, SignupInput, User } from './types'
+import type {
+  Api,
+  AuthResult,
+  ExecutionResult,
+  ExecutionSubmission,
+  InterviewQuestion,
+  Member,
+  Role,
+  Room,
+  ShareLink,
+  SignupInput,
+  User,
+} from './types'
 
 /**
  * In-memory + localStorage mock of the backend. Stands in for local UI work when
@@ -30,6 +42,73 @@ function save(s: Store) {
 
 let id = 0
 const nextId = (p: string) => `${p}_${Date.now().toString(36)}_${id++}`
+
+// --- code execution (mock) ---------------------------------------------------
+// No backend, so only JavaScript can actually run — evaluated right in the browser.
+// Other languages fail with a clear message pointing at VITE_API_URL. Executions are
+// synchronous here, so runner.ts's polling/streaming paths never kick in for the mock.
+const mockExecutions: Record<string, ExecutionResult> = {}
+
+function formatMockValue(v: unknown): string {
+  if (typeof v === 'string') return v
+  try {
+    return JSON.stringify(v)
+  } catch {
+    return String(v)
+  }
+}
+
+async function mockExecute(language: string, sourceCode: string, stdin?: string): Promise<ExecutionResult> {
+  const start = Date.now()
+  if (language !== 'javascript') {
+    return {
+      executionId: '',
+      language,
+      status: 'FAILED',
+      stdout: null,
+      stderr: `mock mode can only run JavaScript in-browser — set VITE_API_URL to run ${language} via the real backend`,
+      exitCode: null,
+      executionTimeMs: 0,
+      stdoutTruncated: false,
+      stderrTruncated: false,
+    }
+  }
+
+  const lines: string[] = []
+  const originalLog = console.log
+  console.log = (...args: unknown[]) => lines.push(args.map(formatMockValue).join(' '))
+  try {
+    // eslint-disable-next-line no-new-func
+    const fn = new Function('stdin', sourceCode)
+    const ret = await fn(stdin)
+    if (ret !== undefined) lines.push(`=> ${formatMockValue(ret)}`)
+    return {
+      executionId: '',
+      language,
+      status: 'COMPLETED',
+      stdout: lines.join('\n'),
+      stderr: null,
+      exitCode: 0,
+      executionTimeMs: Date.now() - start,
+      stdoutTruncated: false,
+      stderrTruncated: false,
+    }
+  } catch (e) {
+    return {
+      executionId: '',
+      language,
+      status: 'FAILED',
+      stdout: lines.join('\n'),
+      stderr: e instanceof Error ? `${e.name}: ${e.message}` : String(e),
+      exitCode: 1,
+      executionTimeMs: Date.now() - start,
+      stdoutTruncated: false,
+      stderrTruncated: false,
+    }
+  } finally {
+    console.log = originalLog
+  }
+}
 
 function rememberUser(user: User) {
   try {
@@ -182,5 +261,39 @@ export const mockApi: Api = {
       reader.readAsDataURL(file)
     })
     return { id: nextId('img'), url }
+  },
+
+  // --- code execution ---
+  async execute(language, sourceCode, stdin): Promise<ExecutionSubmission> {
+    const executionId = nextId('exec')
+    const result = { ...(await mockExecute(language, sourceCode, stdin)), executionId }
+    mockExecutions[executionId] = result
+    return { executionId, status: result.status }
+  },
+
+  async getExecutionStatus(executionId): Promise<ExecutionSubmission> {
+    const result = mockExecutions[executionId]
+    return { executionId, status: result?.status ?? 'FAILED' }
+  },
+
+  async getExecutionResult(executionId): Promise<ExecutionResult> {
+    return (
+      mockExecutions[executionId] ?? {
+        executionId,
+        language: '',
+        status: 'FAILED',
+        stdout: null,
+        stderr: 'unknown execution id',
+        exitCode: null,
+        executionTimeMs: 0,
+        stdoutTruncated: false,
+        stderrTruncated: false,
+      }
+    )
+  },
+
+  async cancelExecution(_executionId) {
+    // Mock executions run synchronously and are already finished by the time execute()
+    // returns, so there's nothing in-flight to cancel.
   },
 }
