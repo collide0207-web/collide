@@ -1,4 +1,5 @@
-import type { Api, AuthResult, InterviewQuestion, Member, Role, Room, ShareLink, SignupInput, User } from './types'
+import type { Api, AuthResult, InterviewQuestion, Member, ProblemSummary, ProgressUpdate, Role, Room, ShareLink, SignupInput, User, UserProgress } from './types'
+import { MOCK_PROBLEMS } from '../problems/seed'
 
 /**
  * In-memory + localStorage mock of the backend. Stands in for local UI work when
@@ -14,6 +15,14 @@ interface Store {
   rooms: Record<string, Room>
   members: Record<string, Member[]>
   interview?: Record<string, InterviewQuestion[]>
+  progress?: Record<string, UserProgress>
+}
+
+function emptyProgress(problemId: string): UserProgress {
+  return {
+    problemId, status: 'unsolved', language: null, code: {}, favorite: false,
+    completed: false, timeSpent: 0, attemptCount: 0, runCount: 0, lastOpened: null, updatedAt: null,
+  }
 }
 
 function load(): Store {
@@ -182,5 +191,64 @@ export const mockApi: Api = {
       reader.readAsDataURL(file)
     })
     return { id: nextId('img'), url }
+  },
+
+  // --- problems & progress (served from the embedded mirror) ---
+  async getProblems() {
+    return MOCK_PROBLEMS.map<ProblemSummary>((p, i) => ({
+      id: p.id, slug: p.slug, title: p.title, difficulty: p.difficulty,
+      category: p.category, tags: p.tags, order: i,
+      hasStatement: !!p.description,
+    }))
+  },
+
+  async getProblem(slug) {
+    const p = MOCK_PROBLEMS.find((x) => x.slug === slug)
+    if (!p) throw new Error('problem not found')
+    return p
+  },
+
+  async getProblemCategories() {
+    return [...new Set(MOCK_PROBLEMS.map((p) => p.category))]
+  },
+
+  async getAllProgress() {
+    return Object.values(load().progress || {})
+  },
+
+  async getProblemProgress(problemId) {
+    return load().progress?.[problemId] || emptyProgress(problemId)
+  },
+
+  async updateProgress(problemId, patch: ProgressUpdate) {
+    const s = load()
+    s.progress = s.progress || {}
+    const cur = s.progress[problemId] || emptyProgress(problemId)
+    const next: UserProgress = {
+      ...cur,
+      status: patch.completed ? 'solved' : patch.status ?? cur.status,
+      language: patch.language ?? cur.language,
+      code: patch.code ?? cur.code,
+      completed: patch.completed ?? cur.completed,
+      runCount: cur.runCount + (patch.bumpRun ? 1 : 0),
+      attemptCount: cur.attemptCount + (patch.bumpAttempt ? 1 : 0),
+      timeSpent: cur.timeSpent + (patch.timeSpentInc || 0),
+      lastOpened: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+    if (patch.bumpRun && next.status === 'unsolved') next.status = 'attempted'
+    s.progress[problemId] = next
+    save(s)
+    return next
+  },
+
+  async setFavorite(problemId, favorite) {
+    const s = load()
+    s.progress = s.progress || {}
+    const cur = s.progress[problemId] || emptyProgress(problemId)
+    const next = { ...cur, favorite, updatedAt: new Date().toISOString() }
+    s.progress[problemId] = next
+    save(s)
+    return next
   },
 }
