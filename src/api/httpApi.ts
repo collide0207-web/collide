@@ -61,18 +61,35 @@ async function parse<T>(res: Response): Promise<T> {
   return (env && typeof env === 'object' && 'data' in env ? env.data : (body as T)) as T
 }
 
-/** Coerce a JSONB field to a string[] — tolerates arrays, null, or a JSON-string. */
-function asStringArray(v: unknown): string[] {
-  if (Array.isArray(v)) return v.map((x) => String(x))
+/**
+ * JSONB fields can arrive as native JSON, null, or (if the backend serializes them
+ * as text) a JSON-encoded string. These coercers make the client tolerant of all
+ * three so the UI never breaks on shape — the language dropdown, starter code and
+ * examples all depend on this.
+ */
+function parseMaybeJson(v: unknown): unknown {
   if (typeof v === 'string' && v.trim()) {
-    try {
-      const parsed = JSON.parse(v)
-      return Array.isArray(parsed) ? parsed.map((x) => String(x)) : []
-    } catch {
-      return []
-    }
+    try { return JSON.parse(v) } catch { return v }
   }
-  return []
+  return v
+}
+
+function asStringArray(v: unknown): string[] {
+  const p = parseMaybeJson(v)
+  return Array.isArray(p) ? p.map((x) => String(x)) : []
+}
+
+function asRecord(v: unknown): Record<string, string> {
+  const p = parseMaybeJson(v)
+  if (p && typeof p === 'object' && !Array.isArray(p)) {
+    return Object.fromEntries(Object.entries(p as Record<string, unknown>).map(([k, val]) => [k, String(val)]))
+  }
+  return {}
+}
+
+function asExamples<T>(v: unknown): T[] | null {
+  const p = parseMaybeJson(v)
+  return Array.isArray(p) ? (p as T[]) : null
 }
 
 function jsonInit(init?: RequestInit, token?: string | null): RequestInit {
@@ -318,12 +335,22 @@ export const httpApi: Api = {
     const p = await authed<ProblemDetail>(`/api/problems/${encodeURIComponent(slug)}`)
     // JSONB fields can arrive as arrays, null, or (defensively) a JSON string —
     // normalize so the UI can always .map/.slice them safely.
+    const starterCode = asRecord(p.starterCode)
+    let supportedLanguages = asStringArray(p.supportedLanguages)
+    // Never leave the language picker empty: fall back to the starter-code languages,
+    // then to the standard four.
+    if (supportedLanguages.length === 0) {
+      supportedLanguages = Object.keys(starterCode)
+    }
+    if (supportedLanguages.length === 0) {
+      supportedLanguages = ['javascript', 'python', 'java', 'cpp']
+    }
     return {
       ...p,
       tags: asStringArray(p.tags),
-      supportedLanguages: asStringArray(p.supportedLanguages),
-      examples: Array.isArray(p.examples) ? p.examples : null,
-      starterCode: p.starterCode && typeof p.starterCode === 'object' ? p.starterCode : {},
+      supportedLanguages,
+      examples: asExamples(p.examples),
+      starterCode,
     }
   },
 
