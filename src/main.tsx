@@ -5,6 +5,8 @@ import { LoginPage } from './auth/LoginPage'
 import { ModeSelect } from './rooms/ModeSelect'
 import { InterviewSetupPage } from './rooms/InterviewSetupPage'
 import { RoomPage } from './rooms/RoomPage'
+import { ProblemsPage } from './problems/ProblemsPage'
+import { ProblemDetailPage } from './problems/ProblemDetailPage'
 import './index.css'
 
 const router = createBrowserRouter([
@@ -12,6 +14,8 @@ const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
   { path: '/home', element: <ModeSelect /> },
   { path: '/interview/setup', element: <InterviewSetupPage /> },
+  { path: '/problems', element: <ProblemsPage /> },
+  { path: '/problems/:slug', element: <ProblemDetailPage /> },
   { path: '/room/:roomId', element: <RoomPage /> },
 ])
 

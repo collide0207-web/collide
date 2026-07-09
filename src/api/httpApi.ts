@@ -1,4 +1,4 @@
-import type { Api, AuthResult, InterviewQuestion, Member, Role, Room, RoomMode, ShareLink, SignupInput, User } from './types'
+import type { Api, AuthResult, InterviewQuestion, Member, ProblemDetail, ProblemSummary, ProgressUpdate, Role, Room, RoomMode, ShareLink, SignupInput, User, UserProgress } from './types'
 import { useSession } from '../store/session'
 
 /**
@@ -259,5 +259,39 @@ export const httpApi: Api = {
     }
     const { id } = await parse<{ id: string }>(res)
     return { id, url: `${BASE}/rooms/${roomId}/interview/images/${id}` }
+  },
+
+  // --- problems & progress ---
+  async getProblems(sheet = 'neetcode150') {
+    return authed<ProblemSummary[]>(`/api/problems?sheet=${encodeURIComponent(sheet)}`)
+  },
+
+  async getProblem(slug) {
+    return authed<ProblemDetail>(`/api/problems/${encodeURIComponent(slug)}`)
+  },
+
+  async getProblemCategories(sheet = 'neetcode150') {
+    return authed<string[]>(`/api/problems/categories?sheet=${encodeURIComponent(sheet)}`)
+  },
+
+  async getAllProgress() {
+    return authed<UserProgress[]>('/api/progress')
+  },
+
+  async getProblemProgress(problemId) {
+    return authed<UserProgress>(`/api/progress/${problemId}`)
+  },
+
+  async updateProgress(problemId, patch: ProgressUpdate) {
+    return authed<UserProgress>(`/api/progress/${problemId}`, {
+      method: 'PUT',
+      body: JSON.stringify(patch),
+    })
+  },
+
+  async setFavorite(problemId, favorite) {
+    return authed<UserProgress>(`/api/progress/${problemId}/favorite`, {
+      method: favorite ? 'POST' : 'DELETE',
+    })
   },
 }
