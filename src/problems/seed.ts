@@ -15,8 +15,9 @@ const LANGS = ['javascript', 'python', 'java', 'cpp']
 
 export const MOCK_PROBLEMS: ProblemDetail[] = [
   {
-    id: 'p-two-sum', slug: 'two-sum', title: 'Two Sum', difficulty: 'easy', category: 'Arrays',
+    id: 'p-two-sum', slug: 'two-sum', title: 'Two Sum', difficulty: 'easy', category: 'Arrays & Hashing',
     tags: ['array', 'hash-map'], sourceUrl: 'https://leetcode.com/problems/two-sum/',
+    // categories mirror the canonical NeetCode patterns used by the backend seed
     description: 'You are given an array of integers and a target value. Return the indices of the two numbers that add up to the target. Each input has exactly one solution, and you may not use the same element twice.',
     examples: [
       { input: 'nums = [2, 7, 11, 15], target = 9', output: '[0, 1]', explanation: 'nums[0] + nums[1] == 9.' },
@@ -26,7 +27,7 @@ export const MOCK_PROBLEMS: ProblemDetail[] = [
     supportedLanguages: LANGS, starterCode: STARTER('twoSum', 'nums, target'),
   },
   {
-    id: 'p-valid-anagram', slug: 'valid-anagram', title: 'Valid Anagram', difficulty: 'easy', category: 'Arrays',
+    id: 'p-valid-anagram', slug: 'valid-anagram', title: 'Valid Anagram', difficulty: 'easy', category: 'Arrays & Hashing',
     tags: ['string', 'hash-map'], sourceUrl: 'https://leetcode.com/problems/valid-anagram/',
     description: 'Given two strings, determine whether the second is an anagram of the first — the same characters with the same frequencies, reordered.',
     examples: [
@@ -37,7 +38,7 @@ export const MOCK_PROBLEMS: ProblemDetail[] = [
     supportedLanguages: LANGS, starterCode: STARTER('isAnagram', 's, t'),
   },
   {
-    id: 'p-contains-duplicate', slug: 'contains-duplicate', title: 'Contains Duplicate', difficulty: 'easy', category: 'Arrays',
+    id: 'p-contains-duplicate', slug: 'contains-duplicate', title: 'Contains Duplicate', difficulty: 'easy', category: 'Arrays & Hashing',
     tags: ['array', 'hash-set'], sourceUrl: 'https://leetcode.com/problems/contains-duplicate/',
     description: 'Given an integer array, return true if any value appears at least twice, and false if every element is distinct.',
     examples: [
@@ -48,7 +49,7 @@ export const MOCK_PROBLEMS: ProblemDetail[] = [
     supportedLanguages: LANGS, starterCode: STARTER('containsDuplicate', 'nums'),
   },
   {
-    id: 'p-group-anagrams', slug: 'group-anagrams', title: 'Group Anagrams', difficulty: 'medium', category: 'Arrays',
+    id: 'p-group-anagrams', slug: 'group-anagrams', title: 'Group Anagrams', difficulty: 'medium', category: 'Arrays & Hashing',
     tags: ['string', 'hash-map', 'sorting'], sourceUrl: 'https://leetcode.com/problems/group-anagrams/',
     description: null, examples: null, constraints: null,
     supportedLanguages: LANGS, starterCode: STARTER('groupAnagrams', 'strs'),
@@ -125,7 +126,7 @@ export const MOCK_PROBLEMS: ProblemDetail[] = [
     supportedLanguages: LANGS, starterCode: STARTER('invertTree', 'root'),
   },
   {
-    id: 'p-climbing-stairs', slug: 'climbing-stairs', title: 'Climbing Stairs', difficulty: 'easy', category: 'Dynamic Programming',
+    id: 'p-climbing-stairs', slug: 'climbing-stairs', title: 'Climbing Stairs', difficulty: 'easy', category: '1-D Dynamic Programming',
     tags: ['dynamic-programming', 'math'], sourceUrl: 'https://leetcode.com/problems/climbing-stairs/',
     description: 'You are climbing a staircase with n steps; each move climbs 1 or 2 steps. Return the number of distinct ways to reach the top.',
     examples: [
