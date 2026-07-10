@@ -5,7 +5,7 @@ import type {
   ExecutionSubmission,
   InterviewQuestion,
   Member,
-  ProblemDetail, ProblemSummary, ProgressUpdate, Role,
+  ProblemDetail, ProblemHarness, ProblemSummary, ProgressUpdate, Role,
   Room,
   RoomMode,
   ShareLink,
@@ -73,6 +73,22 @@ function asStringArray(v: unknown): string[] {
     }
   }
   return []
+}
+
+/** Coerce a JSONB harness blob (object, JSON-string, or null) to ProblemHarness | null. */
+function normalizeHarness(v: unknown): ProblemHarness | null {
+  let h = v
+  if (typeof h === 'string' && h.trim()) {
+    try {
+      h = JSON.parse(h)
+    } catch {
+      return null
+    }
+  }
+  if (!h || typeof h !== 'object' || Array.isArray(h)) return null
+  const o = h as Record<string, unknown>
+  if (typeof o.entry !== 'string' || !Array.isArray(o.params) || !Array.isArray(o.tests)) return null
+  return o as unknown as ProblemHarness
 }
 
 function jsonInit(init?: RequestInit, token?: string | null): RequestInit {
@@ -324,6 +340,7 @@ export const httpApi: Api = {
       supportedLanguages: asStringArray(p.supportedLanguages),
       examples: Array.isArray(p.examples) ? p.examples : null,
       starterCode: p.starterCode && typeof p.starterCode === 'object' ? p.starterCode : {},
+      harness: normalizeHarness(p.harness),
     }
   },
 
