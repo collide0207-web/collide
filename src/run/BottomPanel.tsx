@@ -6,6 +6,8 @@ interface Props {
   /** Minimized state is owned by the parent so it can relayout the editor instantly. */
   collapsed: boolean
   onToggle: () => void
+  /** Shown in the idle empty state (e.g. explaining a problem has no test harness yet). */
+  hint?: string
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -18,7 +20,7 @@ const STATUS_LABEL: Record<string, string> = {
   CANCELLED: 'cancelled',
 }
 
-export function BottomPanel({ result, running, collapsed, onToggle }: Props) {
+export function BottomPanel({ result, running, collapsed, onToggle, hint }: Props) {
   return (
     <div className={`bottom-panel ${collapsed ? 'collapsed' : ''}`}>
       <div className="panel-tabs">
@@ -41,7 +43,7 @@ export function BottomPanel({ result, running, collapsed, onToggle }: Props) {
       {!collapsed && (
         <div className="panel-body">
           <pre className="output">
-            {!running && !result && 'Press Run to execute.'}
+            {!running && !result && (hint || 'Press Run to execute.')}
             {result?.stdout}
             {result?.stderr && <span className="err">{(result.stdout ? '\n' : '') + result.stderr}</span>}
             {result && !running && !result.stdout && !result.stderr &&

@@ -116,6 +116,31 @@ export interface ProblemExample {
   explanation?: string
 }
 
+/** One positional parameter of a harnessed problem's entry function. */
+export interface HarnessParam {
+  name: string
+  /** Canonical type tag driving codegen: int, double, bool, string, int[], string[], int[][], … */
+  type: string
+}
+
+/** One example case: `input` values in param order, `expected` return value. */
+export interface HarnessTest {
+  input: unknown[]
+  expected: unknown
+}
+
+/**
+ * LeetCode-style test-runner metadata. When present, Run wraps the user's `Solution`
+ * in a generated driver (main + I/O), feeds each test's inputs, and checks the output
+ * against `expected`. Absent → Run executes the submitted source as-is.
+ */
+export interface ProblemHarness {
+  entry: string
+  params: HarnessParam[]
+  returns: string
+  tests: HarnessTest[]
+}
+
 export interface ProblemDetail {
   id: string
   slug: string
@@ -130,6 +155,8 @@ export interface ProblemDetail {
   /** language → starter code. */
   starterCode: Record<string, string>
   supportedLanguages: string[]
+  /** Test-runner metadata; null for metadata-only or not-yet-authored problems. */
+  harness?: ProblemHarness | null
 }
 
 export interface UserProgress {

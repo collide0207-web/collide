@@ -4,7 +4,9 @@ import Editor, { type OnMount } from '@monaco-editor/react'
 import { api } from '../api'
 import { SplitPane } from '../layout/SplitPane'
 import { BottomPanel } from '../run/BottomPanel'
+import { TestCasePanel } from './TestCasePanel'
 import { runCode, type RunHandle, type RunUpdate } from '../run/runner'
+import { buildProgram, canonical, formatSignature, hasHarness, outputMatches, type CaseResult } from '../run/harness'
 import type { ExecutionStatus, ProblemDetail, UserProgress } from '../api/types'
 
 const LANG_LABEL: Record<string, string> = {
@@ -37,9 +39,19 @@ export function ProblemDetailPage() {
   const [running, setRunning] = useState(false)
   const [result, setResult] = useState<RunUpdate | null>(null)
   const [outputCollapsed, setOutputCollapsed] = useState(false)
+  const [copied, setCopied] = useState(false)
+
+  // Harness (LeetCode-style) run state: one result per example case + a custom case.
+  const [caseResults, setCaseResults] = useState<CaseResult[]>([])
+  const [activeCase, setActiveCase] = useState(0)
+  const [customArgs, setCustomArgs] = useState<string[]>([])
+
+  const harness = problem && hasHarness(problem.harness) ? problem.harness : null
 
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null)
   const runHandleRef = useRef<RunHandle | null>(null)
+  // Bumped to supersede/cancel an in-flight multi-case run.
+  const runToken = useRef(0)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const codeRef = useRef<Record<string, string>>({})
   const langRef = useRef(language)
@@ -69,6 +81,12 @@ export function ProblemDetailPage() {
           ? prog.language
           : p.supportedLanguages[0] || 'javascript'
         setLanguage(lang)
+        // Prefill the Custom case with the first example's inputs (as JSON text).
+        if (hasHarness(p.harness)) {
+          setCustomArgs(p.harness.params.map((_, i) => canonical(p.harness!.tests[0]?.input[i] ?? null)))
+          setActiveCase(0)
+          setCaseResults([])
+        }
         api.updateProgress(p.id, { language: lang }).catch(() => {})
       } catch {
         if (live) setNotFound(true)
@@ -120,6 +138,7 @@ export function ProblemDetailPage() {
 
   function onRun() {
     if (!problem || running) return
+    if (harness) { void runHarness(false); return }
     setRunning(true)
     setResult(null)
     setOutputCollapsed(false)
@@ -132,7 +151,77 @@ export function ProblemDetailPage() {
     save({ bumpRun: true })
   }
 
+  function onSubmit() {
+    if (!problem || running || !harness) return
+    void runHarness(true)
+  }
+
+  // Runs one composed program to completion, resolving with the terminal update.
+  function runOnce(program: string): Promise<RunUpdate> {
+    return new Promise((resolve) => {
+      runHandleRef.current = runCode(langRef.current, program, undefined, (u) => {
+        if (TERMINAL.includes(u.status)) resolve(u)
+      })
+    })
+  }
+
+  function parseCustom(): unknown[] | null {
+    if (!harness) return null
+    try {
+      return harness.params.map((_, i) => JSON.parse(customArgs[i] ?? ''))
+    } catch {
+      return null
+    }
+  }
+
+  // Run each example case (and, on Run, the custom case) through the generated driver,
+  // filling caseResults as they finish. On Submit, mark solved if every example passes.
+  async function runHarness(submit: boolean) {
+    if (!problem || !harness) return
+    const token = ++runToken.current
+    setRunning(true)
+    setOutputCollapsed(false)
+
+    const cases: { args: unknown[]; expected: unknown; custom: boolean }[] =
+      harness.tests.map((t) => ({ args: t.input, expected: t.expected, custom: false }))
+    if (!submit) {
+      const custom = parseCustom()
+      if (custom) cases.push({ args: custom, expected: undefined, custom: true })
+    }
+
+    const results: CaseResult[] = cases.map(() => ({ status: 'PENDING', stdout: '', stderr: '', pass: null }))
+    setCaseResults(results)
+    setActiveCase(submit ? 0 : activeCase)
+
+    for (let i = 0; i < cases.length; i++) {
+      if (token !== runToken.current) return
+      const program = buildProgram(langRef.current, codeRef.current[langRef.current] ?? '', harness, cases[i].args)
+      if (!program) {
+        results[i] = { status: 'FAILED', stdout: '', stderr: `Run isn't supported for ${langRef.current} yet.`, pass: false }
+      } else {
+        const u = await runOnce(program)
+        if (token !== runToken.current) return
+        results[i] = {
+          status: u.status,
+          stdout: u.stdout,
+          stderr: u.stderr,
+          pass: cases[i].custom ? null : (u.status === 'COMPLETED' && outputMatches(u.stdout, cases[i].expected)),
+        }
+      }
+      setCaseResults([...results])
+    }
+    if (token !== runToken.current) return
+    setRunning(false)
+
+    const allPass = harness.tests.every((_, i) => results[i].pass === true)
+    save({ bumpRun: true })
+    if (submit && allPass) {
+      api.updateProgress(problem.id, { status: 'solved', completed: true }).then(setProgress).catch(() => {})
+    }
+  }
+
   function onStop() {
+    runToken.current++ // supersede any in-flight multi-case run
     runHandleRef.current?.cancel()
     setRunning(false)
   }
@@ -150,6 +239,8 @@ export function ProblemDetailPage() {
 
   function copyCode() {
     navigator.clipboard?.writeText(codeByLang[language] ?? '')
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1400)
   }
 
   const handleMount: OnMount = (editor, monaco) => {
@@ -190,6 +281,11 @@ export function ProblemDetailPage() {
           {progress?.status === 'solved' && <span className="status-badge solved">✓ Solved</span>}
         </div>
         <div className="prob-tags">{problem.tags.map((t) => <span key={t} className="tag">{t}</span>)}</div>
+        {harness && (
+          <div className="prob-signature" title="Implement this function — Run/Submit call it with the test inputs">
+            <code>{formatSignature(harness)}</code>
+          </div>
+        )}
       </div>
 
       {problem.description ? (
@@ -235,9 +331,15 @@ export function ProblemDetailPage() {
         </select>
         <button className="btn-ghost" onClick={resetCode} title="Reset to starter code">Reset</button>
         <button className="btn-ghost" onClick={formatCode} title="Format (Ctrl+Shift+F)">Format</button>
-        <button className="btn-ghost" onClick={copyCode} title="Copy code">Copy</button>
         <span className="spacer" />
-        <button className="btn-ghost" disabled title="Submit — coming with the execution engine">Submit</button>
+        <button
+          className="btn-ghost"
+          onClick={onSubmit}
+          disabled={running || !harness}
+          title={harness ? 'Submit — run all example cases' : 'Submit — available once this problem has a test harness'}
+        >
+          Submit
+        </button>
         {running && <button className="btn-ghost" onClick={onStop} title="Stop">■ Stop</button>}
         <button className="run-btn" onClick={onRun} disabled={running} title="Run (Ctrl+Enter)">
           {running ? 'Running…' : '▶ Run'}
@@ -245,6 +347,14 @@ export function ProblemDetailPage() {
       </div>
 
       <div className="prob-monaco">
+        <button
+          className="editor-copy"
+          onClick={copyCode}
+          title={copied ? 'Copied!' : 'Copy code'}
+          aria-label="Copy code"
+        >
+          {copied ? <CheckIcon /> : <CopyIcon />}
+        </button>
         <Editor
           language={language}
           theme={theme}
@@ -262,12 +372,27 @@ export function ProblemDetailPage() {
         />
       </div>
 
-      <BottomPanel
-        result={result}
-        running={running}
-        collapsed={outputCollapsed}
-        onToggle={() => setOutputCollapsed((v) => !v)}
-      />
+      {harness ? (
+        <TestCasePanel
+          harness={harness}
+          results={caseResults}
+          active={activeCase}
+          onActive={setActiveCase}
+          customArgs={customArgs}
+          onCustomArg={(i, v) => setCustomArgs((a) => { const n = [...a]; n[i] = v; return n })}
+          running={running}
+          collapsed={outputCollapsed}
+          onToggle={() => setOutputCollapsed((v) => !v)}
+        />
+      ) : (
+        <BottomPanel
+          result={result}
+          running={running}
+          collapsed={outputCollapsed}
+          onToggle={() => setOutputCollapsed((v) => !v)}
+          hint="No test cases yet for this problem. Run executes your code as a standalone program — you'll need your own main / entry point. Test harness coming soon."
+        />
+      )}
     </div>
   )
 
@@ -278,6 +403,23 @@ export function ProblemDetailPage() {
         <SplitPane storageKey="collide-prob-split" a={statementPane} b={editorPane} />
       </div>
     </div>
+  )
+}
+
+function CopyIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden>
+      <rect x="5.5" y="5.5" width="8" height="8" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M3.5 10.5H3a1.5 1.5 0 0 1-1.5-1.5V3A1.5 1.5 0 0 1 3 1.5h6A1.5 1.5 0 0 1 10.5 3v.5" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function CheckIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden>
+      <path d="M3.5 8.5l3 3 6-6.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   )
 }
 
