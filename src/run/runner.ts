@@ -27,6 +27,8 @@ const POLL_MAX_ATTEMPTS = 300 // ~90s ceiling, matched to the backend's own exec
 
 export function runCode(language: string, sourceCode: string, stdin: string | undefined, onUpdate: (u: RunUpdate) => void): RunHandle {
   let cancelled = false
+  let done = false // terminal reached (by socket OR poll) — stops the other path
+  let pollStarted = false
   let executionId: string | null = null
   let stopSocket: (() => void) | null = null
   let stdout = ''
@@ -35,22 +37,35 @@ export function runCode(language: string, sourceCode: string, stdin: string | un
   const emit = (status: ExecutionStatus, exitCode?: number) => onUpdate({ status, stdout, stderr, exitCode })
 
   async function loadFinalResult(id: string) {
+    if (done) return
     const result = await api.getExecutionResult(id)
+    done = true
     stdout = result.stdout ?? stdout
     stderr = result.stderr ?? stderr
     emit(result.status, result.exitCode ?? undefined)
   }
 
   async function pollUntilDone(id: string) {
-    for (let attempt = 0; attempt < POLL_MAX_ATTEMPTS && !cancelled; attempt++) {
+    for (let attempt = 0; attempt < POLL_MAX_ATTEMPTS && !cancelled && !done; attempt++) {
       await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS))
+      if (cancelled || done) return
       const s = await api.getExecutionStatus(id)
+      if (done) return
       if (TERMINAL.has(s.status)) {
         await loadFinalResult(id)
         return
       }
       emit(s.status)
     }
+  }
+
+  // Poll as a BACKSTOP even when the socket connects: fast programs can finish
+  // before the socket subscribes, and the server doesn't replay missed events —
+  // without this the UI would hang at "queued" forever. `done` dedupes the paths.
+  const startPoll = () => {
+    if (pollStarted || !executionId) return
+    pollStarted = true
+    void pollUntilDone(executionId)
   }
 
   void (async () => {
@@ -81,16 +96,19 @@ export function runCode(language: string, sourceCode: string, stdin: string | un
         stderr += chunk
         emit('RUNNING')
       },
-      onStatus: (status) => emit(status),
+      onStatus: (status) => { if (!done) emit(status) },
       onResult: (result) => {
+        if (done) return
+        done = true
         stdout = result.stdout ?? stdout
         stderr = result.stderr ?? stderr
         emit(result.status, result.exitCode ?? undefined)
       },
-      onUnavailable: () => {
-        void pollUntilDone(executionId!)
-      },
+      onUnavailable: startPoll,
     })
+
+    // Always run the polling backstop alongside the socket (see startPoll).
+    startPoll()
   })()
 
   return {
