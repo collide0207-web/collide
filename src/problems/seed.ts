@@ -1154,7 +1154,7 @@ export const MOCK_PROBLEMS: ProblemDetail[] = [
       "stack"
     ],
     "sourceUrl": "https://leetcode.com/problems/trapping-rain-water/",
-    "description": "Given an elevation map represented by non-negative bar heights of width 1, compute how much rainwater it can trap after raining.",
+    "description": "You are given an array of non-negative integers where each value is the height of a unit-width bar standing side by side. After a rainstorm, find the total volume of water pooled between the bars.",
     "examples": [
       {
         "input": "height = [0,1,0,2,1,0,1,3,2,1,2,1]",
@@ -6254,7 +6254,7 @@ export const MOCK_PROBLEMS: ProblemDetail[] = [
       "bfs"
     ],
     "sourceUrl": "https://leetcode.com/problems/maximum-depth-of-binary-tree/",
-    "description": "Given the root of a binary tree, return the number of nodes along the longest path from the root down to the farthest leaf node (a tree with a single node has depth 1; an empty tree has depth 0).",
+    "description": "You are given the root of a binary tree. Its depth is defined by how many nodes sit on the deepest root-to-leaf path; find that count (a single-node tree has depth 1, and an empty tree has depth 0).",
     "examples": [
       {
         "input": "root = [3,9,20,null,null,15,7]",
@@ -12624,7 +12624,7 @@ export const MOCK_PROBLEMS: ProblemDetail[] = [
       "array"
     ],
     "sourceUrl": "https://leetcode.com/problems/single-number/",
-    "description": "Given an array where every element appears exactly twice except for one, return the element that appears only once, using O(1) extra space.",
+    "description": "In an array where each value shows up in pairs except for a single unpaired value, identify that lone value. Solve it using only constant extra space.",
     "examples": [
       {
         "input": "nums = [2,2,1]",
@@ -14619,7 +14619,7 @@ export const MOCK_PROBLEMS: ProblemDetail[] = [
       "string"
     ],
     "sourceUrl": "https://leetcode.com/problems/edit-distance/",
-    "description": "Given two strings word1 and word2, return the minimum number of single-character insert, delete, or replace operations needed to transform word1 into word2.",
+    "description": "You have two strings, word1 and word2. Find the fewest single-character edits (inserting, deleting, or replacing one character at a time) required to turn word1 into word2.",
     "examples": [
       {
         "input": "word1 = \"horse\", word2 = \"ros\"",
