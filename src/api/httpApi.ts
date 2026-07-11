@@ -325,7 +325,7 @@ export const httpApi: Api = {
   },
 
   // --- problems & progress ---
-  async getProblems(sheet = 'neetcode150') {
+  async getProblems(sheet = 'leetcode150') {
     const list = await authed<ProblemSummary[]>(`/api/problems?sheet=${encodeURIComponent(sheet)}`)
     return list.map((p) => ({ ...p, tags: asStringArray(p.tags) }))
   },
@@ -344,7 +344,7 @@ export const httpApi: Api = {
     }
   },
 
-  async getProblemCategories(sheet = 'neetcode150') {
+  async getProblemCategories(sheet = 'leetcode150') {
     return authed<string[]>(`/api/problems/categories?sheet=${encodeURIComponent(sheet)}`)
   },
 
