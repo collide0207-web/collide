@@ -26,6 +26,23 @@ export function hasHarness(h: ProblemHarness | null | undefined): h is ProblemHa
   return !!h && typeof h.entry === 'string' && Array.isArray(h.params)
 }
 
+export type TypeTag =
+  | { kind: 'scalar' | 'list-node' | 'tree-node' | 'graph-node' | 'operations'; elem: string }
+  | { kind: 'array'; of: TypeTag }
+
+/** Parse a harness type tag. Scalars/plain arrays are `scalar` (their raw tag kept in `elem`,
+ *  so existing literal codegen keeps switching on `int`/`int[]`/… unchanged). Object node types
+ *  and the `operations` mode get their own kinds; `array<T>` wraps a parsed element type. */
+export function parseType(tag: string): TypeTag {
+  const t = tag.trim()
+  if (t === 'operations') return { kind: 'operations', elem: '' }
+  const arr = /^array<(.+)>$/.exec(t)
+  if (arr) return { kind: 'array', of: parseType(arr[1]) }
+  const node = /^(list-node|tree-node|graph-node)<(.+)>$/.exec(t)
+  if (node) return { kind: node[1] as 'list-node' | 'tree-node' | 'graph-node', elem: node[2] }
+  return { kind: 'scalar', elem: t }
+}
+
 /** Human-readable signature shown above the statement, e.g. `maxProfit(prices: int[]) → int`. */
 export function formatSignature(h: ProblemHarness): string {
   const params = h.params.map((p) => `${p.name}: ${p.type}`).join(', ')
@@ -169,6 +186,13 @@ function javaPrint(returns: string, expr: string): string {
 
 // --- program builders -----------------------------------------------------------
 
+/** Per-language type definitions + (de)serializers injected ahead of the driver.
+ *  Empty until the per-type tasks fill it in. `userCode` lets us skip a definition the
+ *  user already provides (mirrors the #include/import guards below). */
+function preludeFor(_language: string, _h: ProblemHarness, _userCode: string): string {
+  return ''
+}
+
 /**
  * Compose a complete runnable program: the user's code plus a generated driver that
  * calls `entry` with `args` (in param order) and prints the result as canonical JSON.
@@ -184,12 +208,14 @@ export function buildProgram(
 
   switch (language) {
     case 'javascript': {
+      const prelude = preludeFor('javascript', h, userCode)
       const call = `${h.entry}(${args.map((a, i) => jsLiteral(types[i], a)).join(', ')})`
-      return `${userCode}\n\n;(function(){ console.log(JSON.stringify(${call})); })();\n`
+      return `${prelude}${userCode}\n\n;(function(){ console.log(JSON.stringify(${call})); })();\n`
     }
     case 'python': {
+      const prelude = preludeFor('python', h, userCode)
       const call = `Solution().${h.entry}(${args.map((a, i) => pyLiteral(types[i], a)).join(', ')})`
-      return `${userCode}\n\nimport json\nprint(json.dumps(${call}, separators=(',', ':')))\n`
+      return `${prelude}${userCode}\n\nimport json\nprint(json.dumps(${call}, separators=(',', ':')))\n`
     }
     case 'cpp': {
       const decls = h.params
@@ -199,8 +225,9 @@ export function buildProgram(
       const print = cppPrint(h.returns, `__sol.${h.entry}(${callArgs})`)
       // Guarantee the driver's includes even if the user's saved code stripped them
       // (a bare `class Solution` won't compile against the generated main otherwise).
-      const prelude = /#include\s*<bits\/stdc\+\+\.h>/.test(userCode) ? '' : '#include <bits/stdc++.h>\nusing namespace std;\n\n'
-      return `${prelude}${userCode}\n\nint main() {\n    Solution __sol;\n${decls}\n    ${print}\n    return 0;\n}\n`
+      const includes = /#include\s*<bits\/stdc\+\+\.h>/.test(userCode) ? '' : '#include <bits/stdc++.h>\nusing namespace std;\n\n'
+      const prelude = preludeFor('cpp', h, userCode)
+      return `${includes}${prelude}${userCode}\n\nint main() {\n    Solution __sol;\n${decls}\n    ${print}\n    return 0;\n}\n`
     }
     case 'java': {
       const decls = h.params
@@ -209,8 +236,9 @@ export function buildProgram(
       const callArgs = h.params.map((_, i) => `__a${i}`).join(', ')
       const print = javaPrint(h.returns, `__sol.${h.entry}(${callArgs})`)
       // Imports must precede the class; prepend java.util if the user's code lacks it.
-      const prelude = /import\s+java\.util/.test(userCode) ? '' : 'import java.util.*;\n\n'
-      return `${prelude}${userCode}\n\npublic class Main {\n    public static void main(String[] args) {\n        Solution __sol = new Solution();\n${decls}\n        ${print}\n    }\n}\n`
+      const imports = /import\s+java\.util/.test(userCode) ? '' : 'import java.util.*;\n\n'
+      const prelude = preludeFor('java', h, userCode)
+      return `${imports}${prelude}${userCode}\n\npublic class Main {\n    public static void main(String[] args) {\n        Solution __sol = new Solution();\n${decls}\n        ${print}\n    }\n}\n`
     }
     default:
       return null

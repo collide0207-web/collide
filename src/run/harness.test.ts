@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildProgram, canonical, formatSignature, outputMatches } from './harness'
+import { buildProgram, canonical, formatSignature, outputMatches, parseType } from './harness'
 import type { ProblemHarness } from '../api/types'
 
 const twoSum: ProblemHarness = {
@@ -45,5 +45,23 @@ describe('existing scalar/array codegen (characterization)', () => {
 
   it('canonical produces no-space JSON', () => {
     expect(canonical([0, 1])).toBe('[0,1]')
+  })
+})
+
+describe('parseType', () => {
+  it('parses scalars and arrays as before', () => {
+    expect(parseType('int')).toEqual({ kind: 'scalar', elem: 'int' })
+    expect(parseType('int[]')).toEqual({ kind: 'scalar', elem: 'int[]' })
+  })
+  it('parses object node types with element', () => {
+    expect(parseType('list-node<int>')).toEqual({ kind: 'list-node', elem: 'int' })
+    expect(parseType('tree-node<int>')).toEqual({ kind: 'tree-node', elem: 'int' })
+    expect(parseType('graph-node<int>')).toEqual({ kind: 'graph-node', elem: 'int' })
+  })
+  it('parses operations', () => {
+    expect(parseType('operations')).toEqual({ kind: 'operations', elem: '' })
+  })
+  it('parses nested array<list-node<int>>', () => {
+    expect(parseType('array<list-node<int>>')).toEqual({ kind: 'array', of: { kind: 'list-node', elem: 'int' } })
   })
 })
