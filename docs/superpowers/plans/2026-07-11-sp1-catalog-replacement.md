@@ -552,3 +552,7 @@ git -C collide commit -m "content(seed): regenerate frontend LeetCode 150 mirror
 **Type consistency:** `ProblemHarness.prune(List<Problem>, Set<String>)` used identically in Task 3 test and impl; `validateSeed(problems)` signature identical in Task 2 def and Task 5 usage; frontend `judge?/timeLimitMs?/memoryLimitKb?` names match backend `judge()/timeLimitMs()/memoryLimitKb()`. ✓
 
 **Out of scope (later SPs, by design):** `list-node`/`tree-node`/`operations` codegen (SP2); generator/reference/checker + CI bundles + `problem_test_bundle` (SP3); server judge, Submit endpoint, `submissions`, verdict UX (SP4).
+
+## Post-Implementation Note
+
+Final catalog contains 149 problems (not 150) — the accurate LeetCode Top Interview 150 category breakdown for Bit Manipulation/Math/1D DP/Multidimensional DP totals 26 problems rather than the ~27 originally estimated; this was a deliberate accuracy-over-round-number decision, confirmed during final review.

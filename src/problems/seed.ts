@@ -79,6 +79,19 @@ export const MOCK_PROBLEMS: ProblemDetail[] = [
             1,
             2
           ]
+        },
+        {
+          "input": [
+            [
+              3,
+              3
+            ],
+            6
+          ],
+          "expected": [
+            0,
+            1
+          ]
         }
       ]
     }
@@ -351,6 +364,14 @@ export const MOCK_PROBLEMS: ProblemDetail[] = [
             ]
           ],
           "expected": 2
+        },
+        {
+          "input": [
+            [
+              1
+            ]
+          ],
+          "expected": 1
         }
       ]
     }
@@ -442,6 +463,19 @@ export const MOCK_PROBLEMS: ProblemDetail[] = [
             -1,
             -100
           ]
+        },
+        {
+          "input": [
+            [
+              1,
+              2
+            ],
+            3
+          ],
+          "expected": [
+            2,
+            1
+          ]
         }
       ]
     }
@@ -515,6 +549,18 @@ export const MOCK_PROBLEMS: ProblemDetail[] = [
             ]
           ],
           "expected": 0
+        },
+        {
+          "input": [
+            [
+              1,
+              2,
+              3,
+              4,
+              5
+            ]
+          ],
+          "expected": 4
         }
       ]
     }
@@ -672,6 +718,14 @@ export const MOCK_PROBLEMS: ProblemDetail[] = [
             ]
           ],
           "expected": false
+        },
+        {
+          "input": [
+            [
+              0
+            ]
+          ],
+          "expected": true
         }
       ]
     }
@@ -744,6 +798,17 @@ export const MOCK_PROBLEMS: ProblemDetail[] = [
             ]
           ],
           "expected": 2
+        },
+        {
+          "input": [
+            [
+              1,
+              1,
+              1,
+              1
+            ]
+          ],
+          "expected": 3
         }
       ]
     }
@@ -814,6 +879,17 @@ export const MOCK_PROBLEMS: ProblemDetail[] = [
             ]
           ],
           "expected": 1
+        },
+        {
+          "input": [
+            [
+              4,
+              4,
+              4,
+              4
+            ]
+          ],
+          "expected": 4
         }
       ]
     }
@@ -985,6 +1061,22 @@ export const MOCK_PROBLEMS: ProblemDetail[] = [
             0,
             0
           ]
+        },
+        {
+          "input": [
+            [
+              2,
+              3,
+              4,
+              5
+            ]
+          ],
+          "expected": [
+            60,
+            40,
+            30,
+            24
+          ]
         }
       ]
     }
@@ -1070,6 +1162,25 @@ export const MOCK_PROBLEMS: ProblemDetail[] = [
             ]
           ],
           "expected": -1
+        },
+        {
+          "input": [
+            [
+              5,
+              1,
+              2,
+              3,
+              4
+            ],
+            [
+              4,
+              4,
+              1,
+              5,
+              1
+            ]
+          ],
+          "expected": 4
         }
       ]
     }
@@ -1137,6 +1248,18 @@ export const MOCK_PROBLEMS: ProblemDetail[] = [
             ]
           ],
           "expected": 4
+        },
+        {
+          "input": [
+            [
+              1,
+              3,
+              2,
+              2,
+              1
+            ]
+          ],
+          "expected": 7
         }
       ]
     }
@@ -1218,6 +1341,18 @@ export const MOCK_PROBLEMS: ProblemDetail[] = [
             ]
           ],
           "expected": 9
+        },
+        {
+          "input": [
+            [
+              3,
+              0,
+              2,
+              0,
+              4
+            ]
+          ],
+          "expected": 7
         }
       ]
     }
@@ -1481,6 +1616,16 @@ export const MOCK_PROBLEMS: ProblemDetail[] = [
             ]
           ],
           "expected": ""
+        },
+        {
+          "input": [
+            [
+              "interspecies",
+              "interstellar",
+              "interstate"
+            ]
+          ],
+          "expected": "inters"
         }
       ]
     }
@@ -1683,6 +1828,13 @@ export const MOCK_PROBLEMS: ProblemDetail[] = [
             "leeto"
           ],
           "expected": -1
+        },
+        {
+          "input": [
+            "hello",
+            "ll"
+          ],
+          "expected": 2
         }
       ]
     }
@@ -1771,6 +1923,17 @@ export const MOCK_PROBLEMS: ProblemDetail[] = [
             "What   must   be",
             "acknowledgment  ",
             "shall be        "
+          ]
+        },
+        {
+          "input": [
+            [
+              "a"
+            ],
+            1
+          ],
+          "expected": [
+            "a"
           ]
         }
       ]
@@ -1903,6 +2066,13 @@ export const MOCK_PROBLEMS: ProblemDetail[] = [
             "ahbgdc"
           ],
           "expected": false
+        },
+        {
+          "input": [
+            "",
+            "ahbgdc"
+          ],
+          "expected": true
         }
       ]
     }
@@ -2070,6 +2240,18 @@ export const MOCK_PROBLEMS: ProblemDetail[] = [
             ]
           ],
           "expected": 1
+        },
+        {
+          "input": [
+            [
+              4,
+              3,
+              2,
+              1,
+              4
+            ]
+          ],
+          "expected": 16
         }
       ]
     }
@@ -2751,6 +2933,112 @@ export const MOCK_PROBLEMS: ProblemDetail[] = [
             ]
           ],
           "expected": false
+        },
+        {
+          "input": [
+            [
+              [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ]
+            ]
+          ],
+          "expected": true
         }
       ]
     }
@@ -2867,6 +3155,18 @@ export const MOCK_PROBLEMS: ProblemDetail[] = [
             5,
             6,
             7
+          ]
+        },
+        {
+          "input": [
+            [
+              [
+                1
+              ]
+            ]
+          ],
+          "expected": [
+            1
           ]
         }
       ]
@@ -3009,6 +3309,20 @@ export const MOCK_PROBLEMS: ProblemDetail[] = [
               11
             ]
           ]
+        },
+        {
+          "input": [
+            [
+              [
+                1
+              ]
+            ]
+          ],
+          "expected": [
+            [
+              1
+            ]
+          ]
         }
       ]
     }
@@ -3138,6 +3452,20 @@ export const MOCK_PROBLEMS: ProblemDetail[] = [
               0
             ]
           ]
+        },
+        {
+          "input": [
+            [
+              [
+                1
+              ]
+            ]
+          ],
+          "expected": [
+            [
+              1
+            ]
+          ]
         }
       ]
     }
@@ -3255,6 +3583,44 @@ export const MOCK_PROBLEMS: ProblemDetail[] = [
             [
               1,
               1
+            ]
+          ]
+        },
+        {
+          "input": [
+            [
+              [
+                0,
+                0,
+                0
+              ],
+              [
+                0,
+                0,
+                0
+              ],
+              [
+                0,
+                0,
+                0
+              ]
+            ]
+          ],
+          "expected": [
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
             ]
           ]
         }
@@ -8909,6 +9275,21 @@ export const MOCK_PROBLEMS: ProblemDetail[] = [
               [
                 -1,
                 3
+              ]
+            ]
+          ],
+          "expected": 1
+        },
+        {
+          "input": [
+            [
+              [
+                -1,
+                -1
+              ],
+              [
+                -1,
+                -1
               ]
             ]
           ],
