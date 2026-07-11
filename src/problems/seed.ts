@@ -944,34 +944,51 @@ export const MOCK_PROBLEMS: ProblemDetail[] = [
           "input": [
             [
               [
+                "RandomizedSet",
+                []
+              ],
+              [
                 "insert",
-                1
+                [
+                  1
+                ]
               ],
               [
                 "remove",
-                2
+                [
+                  2
+                ]
               ],
               [
                 "insert",
-                2
+                [
+                  2
+                ]
               ],
               [
-                "getRandom"
+                "getRandom",
+                []
               ],
               [
                 "remove",
-                1
+                [
+                  1
+                ]
               ],
               [
                 "insert",
-                2
+                [
+                  2
+                ]
               ],
               [
-                "getRandom"
+                "getRandom",
+                []
               ]
             ]
           ],
           "expected": [
+            null,
             true,
             false,
             true,
@@ -5113,32 +5130,47 @@ export const MOCK_PROBLEMS: ProblemDetail[] = [
           "input": [
             [
               [
-                "push",
-                -2
+                "MinStack",
+                []
               ],
               [
                 "push",
-                0
+                [
+                  -2
+                ]
               ],
               [
                 "push",
-                -3
+                [
+                  0
+                ]
               ],
               [
-                "getMin"
+                "push",
+                [
+                  -3
+                ]
               ],
               [
-                "pop"
+                "getMin",
+                []
               ],
               [
-                "top"
+                "pop",
+                []
               ],
               [
-                "getMin"
+                "top",
+                []
+              ],
+              [
+                "getMin",
+                []
               ]
             ]
           ],
           "expected": [
+            null,
             null,
             null,
             null,
@@ -5152,25 +5184,37 @@ export const MOCK_PROBLEMS: ProblemDetail[] = [
           "input": [
             [
               [
-                "push",
-                1
+                "MinStack",
+                []
               ],
               [
                 "push",
-                2
+                [
+                  1
+                ]
               ],
               [
-                "getMin"
+                "push",
+                [
+                  2
+                ]
               ],
               [
-                "pop"
+                "getMin",
+                []
               ],
               [
-                "getMin"
+                "pop",
+                []
+              ],
+              [
+                "getMin",
+                []
               ]
             ]
           ],
           "expected": [
+            null,
             null,
             null,
             1,
@@ -6501,47 +6545,67 @@ export const MOCK_PROBLEMS: ProblemDetail[] = [
             [
               [
                 "LRUCache",
-                2
+                [
+                  2
+                ]
               ],
               [
                 "put",
-                1,
-                1
+                [
+                  1,
+                  1
+                ]
               ],
               [
                 "put",
-                2,
-                2
+                [
+                  2,
+                  2
+                ]
               ],
               [
                 "get",
-                1
+                [
+                  1
+                ]
               ],
               [
                 "put",
-                3,
-                3
+                [
+                  3,
+                  3
+                ]
               ],
               [
                 "get",
-                2
+                [
+                  2
+                ]
               ],
               [
                 "put",
-                4,
-                4
+                [
+                  4,
+                  4
+                ]
               ],
               [
                 "get",
-                1
+                [
+                  1
+                ]
               ],
               [
                 "get",
-                3
+                [
+                  3
+                ]
               ],
               [
                 "get",
-                4
+                [
+                  4
+                ]
               ]
             ]
           ],
@@ -6563,29 +6627,41 @@ export const MOCK_PROBLEMS: ProblemDetail[] = [
             [
               [
                 "LRUCache",
-                1
+                [
+                  1
+                ]
               ],
               [
                 "put",
-                2,
-                1
+                [
+                  2,
+                  1
+                ]
               ],
               [
                 "get",
-                2
+                [
+                  2
+                ]
               ],
               [
                 "put",
-                3,
-                2
+                [
+                  3,
+                  2
+                ]
               ],
               [
                 "get",
-                2
+                [
+                  2
+                ]
               ],
               [
                 "get",
-                3
+                [
+                  3
+                ]
               ]
             ]
           ],
@@ -9542,31 +9618,44 @@ export const MOCK_PROBLEMS: ProblemDetail[] = [
           "input": [
             [
               [
-                "Trie"
+                "Trie",
+                []
               ],
               [
                 "insert",
-                "apple"
+                [
+                  "apple"
+                ]
               ],
               [
                 "search",
-                "apple"
+                [
+                  "apple"
+                ]
               ],
               [
                 "search",
-                "app"
+                [
+                  "app"
+                ]
               ],
               [
                 "startsWith",
-                "app"
+                [
+                  "app"
+                ]
               ],
               [
                 "insert",
-                "app"
+                [
+                  "app"
+                ]
               ],
               [
                 "search",
-                "app"
+                [
+                  "app"
+                ]
               ]
             ]
           ],
@@ -9584,27 +9673,38 @@ export const MOCK_PROBLEMS: ProblemDetail[] = [
           "input": [
             [
               [
-                "Trie"
+                "Trie",
+                []
               ],
               [
                 "insert",
-                "cat"
+                [
+                  "cat"
+                ]
               ],
               [
                 "insert",
-                "car"
+                [
+                  "car"
+                ]
               ],
               [
                 "startsWith",
-                "ca"
+                [
+                  "ca"
+                ]
               ],
               [
                 "startsWith",
-                "cab"
+                [
+                  "cab"
+                ]
               ],
               [
                 "search",
-                "car"
+                [
+                  "car"
+                ]
               ]
             ]
           ],
@@ -9621,23 +9721,32 @@ export const MOCK_PROBLEMS: ProblemDetail[] = [
           "input": [
             [
               [
-                "Trie"
+                "Trie",
+                []
               ],
               [
                 "search",
-                "a"
+                [
+                  "a"
+                ]
               ],
               [
                 "startsWith",
-                "a"
+                [
+                  "a"
+                ]
               ],
               [
                 "insert",
-                "a"
+                [
+                  "a"
+                ]
               ],
               [
                 "search",
-                "a"
+                [
+                  "a"
+                ]
               ]
             ]
           ],
@@ -9702,35 +9811,50 @@ export const MOCK_PROBLEMS: ProblemDetail[] = [
           "input": [
             [
               [
-                "WordDictionary"
+                "WordDictionary",
+                []
               ],
               [
                 "addWord",
-                "bad"
+                [
+                  "bad"
+                ]
               ],
               [
                 "addWord",
-                "dad"
+                [
+                  "dad"
+                ]
               ],
               [
                 "addWord",
-                "mad"
+                [
+                  "mad"
+                ]
               ],
               [
                 "search",
-                "pad"
+                [
+                  "pad"
+                ]
               ],
               [
                 "search",
-                "bad"
+                [
+                  "bad"
+                ]
               ],
               [
                 "search",
-                ".ad"
+                [
+                  ".ad"
+                ]
               ],
               [
                 "search",
-                "b.."
+                [
+                  "b.."
+                ]
               ]
             ]
           ],
@@ -9749,23 +9873,32 @@ export const MOCK_PROBLEMS: ProblemDetail[] = [
           "input": [
             [
               [
-                "WordDictionary"
+                "WordDictionary",
+                []
               ],
               [
                 "addWord",
-                "a"
+                [
+                  "a"
+                ]
               ],
               [
                 "search",
-                "."
+                [
+                  "."
+                ]
               ],
               [
                 "search",
-                "a"
+                [
+                  "a"
+                ]
               ],
               [
                 "search",
-                "aa"
+                [
+                  "aa"
+                ]
               ]
             ]
           ],
@@ -9781,23 +9914,32 @@ export const MOCK_PROBLEMS: ProblemDetail[] = [
           "input": [
             [
               [
-                "WordDictionary"
+                "WordDictionary",
+                []
               ],
               [
                 "addWord",
-                "at"
+                [
+                  "at"
+                ]
               ],
               [
                 "addWord",
-                "and"
+                [
+                  "and"
+                ]
               ],
               [
                 "search",
-                "a."
+                [
+                  "a."
+                ]
               ],
               [
                 "search",
-                ".."
+                [
+                  ".."
+                ]
               ]
             ]
           ],
@@ -12462,39 +12604,54 @@ export const MOCK_PROBLEMS: ProblemDetail[] = [
           "input": [
             [
               [
-                "Twitter"
+                "Twitter",
+                []
               ],
               [
                 "postTweet",
-                1,
-                5
+                [
+                  1,
+                  5
+                ]
               ],
               [
                 "getNewsFeed",
-                1
+                [
+                  1
+                ]
               ],
               [
                 "follow",
-                1,
-                2
+                [
+                  1,
+                  2
+                ]
               ],
               [
                 "postTweet",
-                2,
-                6
+                [
+                  2,
+                  6
+                ]
               ],
               [
                 "getNewsFeed",
-                1
+                [
+                  1
+                ]
               ],
               [
                 "unfollow",
-                1,
-                2
+                [
+                  1,
+                  2
+                ]
               ],
               [
                 "getNewsFeed",
-                1
+                [
+                  1
+                ]
               ]
             ]
           ],
@@ -12520,20 +12677,27 @@ export const MOCK_PROBLEMS: ProblemDetail[] = [
           "input": [
             [
               [
-                "Twitter"
+                "Twitter",
+                []
               ],
               [
                 "getNewsFeed",
-                1
+                [
+                  1
+                ]
               ],
               [
                 "postTweet",
-                1,
-                1
+                [
+                  1,
+                  1
+                ]
               ],
               [
                 "getNewsFeed",
-                1
+                [
+                  1
+                ]
               ]
             ]
           ],
@@ -12550,26 +12714,35 @@ export const MOCK_PROBLEMS: ProblemDetail[] = [
           "input": [
             [
               [
-                "Twitter"
+                "Twitter",
+                []
               ],
               [
                 "follow",
-                1,
-                2
+                [
+                  1,
+                  2
+                ]
               ],
               [
                 "postTweet",
-                2,
-                10
+                [
+                  2,
+                  10
+                ]
               ],
               [
                 "postTweet",
-                2,
-                11
+                [
+                  2,
+                  11
+                ]
               ],
               [
                 "getNewsFeed",
-                1
+                [
+                  1
+                ]
               ]
             ]
           ],
@@ -12635,25 +12808,34 @@ export const MOCK_PROBLEMS: ProblemDetail[] = [
           "input": [
             [
               [
-                "MedianFinder"
+                "MedianFinder",
+                []
               ],
               [
                 "addNum",
-                1
+                [
+                  1
+                ]
               ],
               [
                 "addNum",
-                2
+                [
+                  2
+                ]
               ],
               [
-                "findMedian"
+                "findMedian",
+                []
               ],
               [
                 "addNum",
-                3
+                [
+                  3
+                ]
               ],
               [
-                "findMedian"
+                "findMedian",
+                []
               ]
             ]
           ],
@@ -12670,28 +12852,38 @@ export const MOCK_PROBLEMS: ProblemDetail[] = [
           "input": [
             [
               [
-                "MedianFinder"
+                "MedianFinder",
+                []
               ],
               [
                 "addNum",
-                6
+                [
+                  6
+                ]
               ],
               [
-                "findMedian"
-              ],
-              [
-                "addNum",
-                10
-              ],
-              [
-                "findMedian"
+                "findMedian",
+                []
               ],
               [
                 "addNum",
-                2
+                [
+                  10
+                ]
               ],
               [
-                "findMedian"
+                "findMedian",
+                []
+              ],
+              [
+                "addNum",
+                [
+                  2
+                ]
+              ],
+              [
+                "findMedian",
+                []
               ]
             ]
           ],
@@ -12709,25 +12901,34 @@ export const MOCK_PROBLEMS: ProblemDetail[] = [
           "input": [
             [
               [
-                "MedianFinder"
+                "MedianFinder",
+                []
               ],
               [
                 "addNum",
-                -1
+                [
+                  -1
+                ]
               ],
               [
                 "addNum",
-                -2
+                [
+                  -2
+                ]
               ],
               [
-                "findMedian"
+                "findMedian",
+                []
               ],
               [
                 "addNum",
-                -3
+                [
+                  -3
+                ]
               ],
               [
-                "findMedian"
+                "findMedian",
+                []
               ]
             ]
           ],

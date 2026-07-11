@@ -31,6 +31,21 @@ export function validateSeed(problems) {
             err(`test[${i}] arity ${t.input.length} != ${h.params.length} params`)
         }
       }
+      // Design problems (operations mode) carry a canonical op sequence:
+      //   input[0] = [[Ctor,[args]], [method,[args]], ...]; expected is a same-length array.
+      const isOps = Array.isArray(h.params) && h.params.some((pp) => pp.type === 'operations')
+      if (isOps) {
+        for (const [i, t] of (h.tests || []).entries()) {
+          const seq = t?.input?.[0]
+          if (!Array.isArray(seq) || seq.length === 0) { err(`ops test[${i}] must be a non-empty op array`); continue }
+          for (const [j, op] of seq.entries()) {
+            if (!Array.isArray(op) || typeof op[0] !== 'string' || !Array.isArray(op[1]))
+              err(`ops test[${i}] op[${j}] must be [name, [args]]`)
+          }
+          if (!Array.isArray(t?.expected) || t.expected.length !== seq.length)
+            err(`ops test[${i}] expected length must equal op count`)
+        }
+      }
     }
   }
   return errors
