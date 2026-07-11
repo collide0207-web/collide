@@ -93,6 +93,37 @@ export interface ExecutionResult {
   stderrTruncated: boolean
 }
 
+// --- server-side judging (Submit tier, SP4) ---
+
+/** Authoritative verdict codes from the server judge. */
+export type Verdict = 'AC' | 'WA' | 'TLE' | 'RE' | 'CE'
+
+/** Submit lifecycle: PENDING until the judge finishes, then a terminal Verdict. */
+export type SubmissionStatus = 'PENDING' | Verdict
+
+export interface SubmitInput {
+  language: string
+  sourceCode: string
+}
+
+export interface SubmissionSummary {
+  submissionId: string
+  status: SubmissionStatus
+}
+
+export interface SubmissionResult {
+  submissionId: string
+  problemSlug: string
+  language: string
+  status: SubmissionStatus
+  passed: number
+  total: number
+  /** Index of the first failing hidden case, or -1 on AC. Never exposes the hidden input. */
+  failingCaseIndex: number
+  runtimeMs: number
+  createdAt: string
+}
+
 // --- coding-practice problems (NeetCode 150) ---
 
 export type Difficulty = 'easy' | 'medium' | 'hard'
@@ -139,6 +170,12 @@ export interface ProblemHarness {
   params: HarnessParam[]
   returns: string
   tests: HarnessTest[]
+  /** Checker spec: 'exact' | 'unordered' | 'float:<eps>' | 'custom:<id>'. Absent → 'exact'. */
+  judge?: string
+  /** Per-case wall-clock limit (ms) used by server-side Submit (SP4). */
+  timeLimitMs?: number
+  /** Per-case memory cap (KB) used by server-side Submit (SP4). */
+  memoryLimitKb?: number
 }
 
 export interface ProblemDetail {
@@ -222,6 +259,13 @@ export interface Api {
   getExecutionStatus(executionId: string): Promise<ExecutionSubmission>
   getExecutionResult(executionId: string): Promise<ExecutionResult>
   cancelExecution(executionId: string): Promise<void>
+
+  // --- server-side judging (Submit) ---
+  /** Submit a solution for authoritative hidden-case judging. Returns a PENDING id to poll. */
+  submitSolution(slug: string, input: SubmitInput): Promise<SubmissionSummary>
+  getSubmission(submissionId: string): Promise<SubmissionResult>
+  /** This user's submission history for a problem, newest first. */
+  getSubmissions(slug: string): Promise<SubmissionResult[]>
 
   // --- problems & progress (NeetCode 150) ---
   getProblems(sheet?: string): Promise<ProblemSummary[]>

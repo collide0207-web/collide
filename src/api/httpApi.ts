@@ -10,6 +10,7 @@ import type {
   RoomMode,
   ShareLink,
   SignupInput,
+  SubmissionResult, SubmissionSummary, SubmitInput,
   User, UserProgress,
 } from './types'
 import { useSession } from '../store/session'
@@ -324,8 +325,24 @@ export const httpApi: Api = {
     await authed<void>(`/cancel/${executionId}`, { method: 'POST' })
   },
 
+  // --- server-side judging (Submit) ---
+  async submitSolution(slug, input: SubmitInput): Promise<SubmissionSummary> {
+    return authed<SubmissionSummary>(`/api/problems/${encodeURIComponent(slug)}/submit`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    })
+  },
+
+  async getSubmission(submissionId): Promise<SubmissionResult> {
+    return authed<SubmissionResult>(`/api/submissions/${submissionId}`)
+  },
+
+  async getSubmissions(slug): Promise<SubmissionResult[]> {
+    return authed<SubmissionResult[]>(`/api/problems/${encodeURIComponent(slug)}/submissions`)
+  },
+
   // --- problems & progress ---
-  async getProblems(sheet = 'neetcode150') {
+  async getProblems(sheet = 'leetcode150') {
     const list = await authed<ProblemSummary[]>(`/api/problems?sheet=${encodeURIComponent(sheet)}`)
     return list.map((p) => ({ ...p, tags: asStringArray(p.tags) }))
   },
@@ -344,7 +361,7 @@ export const httpApi: Api = {
     }
   },
 
-  async getProblemCategories(sheet = 'neetcode150') {
+  async getProblemCategories(sheet = 'leetcode150') {
     return authed<string[]>(`/api/problems/categories?sheet=${encodeURIComponent(sheet)}`)
   },
 

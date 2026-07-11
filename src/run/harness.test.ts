@@ -1,0 +1,243 @@
+import { describe, expect, it } from 'vitest'
+import { buildProgram, canonical, formatSignature, outputMatches, parseType } from './harness'
+import type { ProblemHarness } from '../api/types'
+
+const twoSum: ProblemHarness = {
+  entry: 'twoSum',
+  params: [{ name: 'nums', type: 'int[]' }, { name: 'target', type: 'int' }],
+  returns: 'int[]',
+  tests: [{ input: [[2, 7, 11, 15], 9], expected: [0, 1] }],
+}
+
+describe('existing scalar/array codegen (characterization)', () => {
+  it('formats a signature', () => {
+    expect(formatSignature(twoSum)).toBe('twoSum(nums: int[], target: int) → int[]')
+  })
+
+  it('JS bakes array + scalar literals and prints canonical JSON', () => {
+    const p = buildProgram('javascript', 'function twoSum(nums,target){return [0,1]}', twoSum, [[2, 7, 11, 15], 9])
+    expect(p).toContain('twoSum([2,7,11,15], 9)')
+    expect(p).toContain('JSON.stringify')
+  })
+
+  it('Python calls Solution().entry with literals', () => {
+    const p = buildProgram('python', 'class Solution:\n    def twoSum(self,nums,target):\n        return [0,1]', twoSum, [[2, 7, 11, 15], 9])
+    expect(p).toContain('Solution().twoSum([2,7,11,15], 9)')
+    expect(p).toContain('json.dumps')
+  })
+
+  it('C++ declares typed locals and prints an int vector', () => {
+    const p = buildProgram('cpp', 'class Solution{public: vector<int> twoSum(vector<int>& n,int t){return {0,1};}};', twoSum, [[2, 7, 11, 15], 9])
+    expect(p).toContain('vector<int> __a0 = {2,7,11,15};')
+    expect(p).toContain('int __a1 = 9;')
+  })
+
+  it('Java declares typed locals and prints an int array', () => {
+    const p = buildProgram('java', 'class Solution{ int[] twoSum(int[] n,int t){return new int[]{0,1};}}', twoSum, [[2, 7, 11, 15], 9])
+    expect(p).toContain('int[] __a0 = new int[]{2,7,11,15};')
+  })
+
+  it('outputMatches tolerates trailing debug lines', () => {
+    expect(outputMatches('debug\n[0,1]', [0, 1])).toBe(true)
+    expect(outputMatches('[0,1]', [0, 1])).toBe(true)
+    expect(outputMatches('[1,0]', [0, 1])).toBe(false)
+  })
+
+  it('canonical produces no-space JSON', () => {
+    expect(canonical([0, 1])).toBe('[0,1]')
+  })
+})
+
+describe('parseType', () => {
+  it('parses scalars and arrays as before', () => {
+    expect(parseType('int')).toEqual({ kind: 'scalar', elem: 'int' })
+    expect(parseType('int[]')).toEqual({ kind: 'scalar', elem: 'int[]' })
+  })
+  it('parses object node types with element', () => {
+    expect(parseType('list-node<int>')).toEqual({ kind: 'list-node', elem: 'int' })
+    expect(parseType('tree-node<int>')).toEqual({ kind: 'tree-node', elem: 'int' })
+    expect(parseType('graph-node<int>')).toEqual({ kind: 'graph-node', elem: 'int' })
+  })
+  it('parses operations', () => {
+    expect(parseType('operations')).toEqual({ kind: 'operations', elem: '' })
+  })
+  it('parses nested array<list-node<int>>', () => {
+    expect(parseType('array<list-node<int>>')).toEqual({ kind: 'array', of: { kind: 'list-node', elem: 'int' } })
+  })
+})
+
+const reverseList: ProblemHarness = {
+  entry: 'reverseList',
+  params: [{ name: 'head', type: 'list-node<int>' }],
+  returns: 'list-node<int>',
+  tests: [{ input: [[1, 2, 3]], expected: [3, 2, 1] }],
+}
+
+function evalJs(program: string | null): string {
+  expect(program).not.toBeNull()
+  let out = ''
+  const log = console.log
+  console.log = (s: string) => { out += s }
+  try { new Function(program!)() } finally { console.log = log }
+  return out
+}
+
+describe('list-node codegen', () => {
+  it('JS builds a list from the array and prints it back as an array', () => {
+    const p = buildProgram('javascript', 'function reverseList(head){return head}', reverseList, [[1, 2, 3]])
+    expect(p).toContain('function ListNode')
+    expect(p).toContain('__toList([1,2,3])')
+    expect(p).toContain('__fromList(')
+  })
+  it('Python injects ListNode and (de)serializers', () => {
+    const p = buildProgram('python', 'class Solution:\n    def reverseList(self,head):\n        return head', reverseList, [[1, 2, 3]])
+    expect(p).toContain('class ListNode')
+    expect(p).toContain('__to_list([1,2,3])')
+    expect(p).toContain('__from_list(')
+  })
+  it('C++ injects ListNode + builds/serializes', () => {
+    const p = buildProgram('cpp', 'class Solution{public: ListNode* reverseList(ListNode* h){return h;}};', reverseList, [[1, 2, 3]])
+    expect(p).toContain('struct ListNode')
+    expect(p).toContain('__toList({1,2,3})')
+    expect(p).toContain('__fromList(')
+  })
+  it('Java injects ListNode + builds/serializes', () => {
+    const p = buildProgram('java', 'class Solution{ ListNode reverseList(ListNode h){return h;}}', reverseList, [[1, 2, 3]])
+    expect(p).toContain('static class ListNode')
+    expect(p).toContain('__toList(new int[]{1,2,3})')
+    expect(p).toContain('__fromList(')
+  })
+  it('JS list-node round-trips through a real reverse (eval smoke)', () => {
+    const p = buildProgram('javascript', 'function reverseList(head){let prev=null;while(head){const n=head.next;head.next=prev;prev=head;head=n;}return prev}', reverseList, [[1, 2, 3]])
+    expect(outputMatches(evalJs(p), [3, 2, 1])).toBe(true)
+  })
+})
+
+const maxDepth: ProblemHarness = {
+  entry: 'maxDepth',
+  params: [{ name: 'root', type: 'tree-node<int>' }],
+  returns: 'int',
+  tests: [{ input: [[3, 9, 20, null, null, 15, 7]], expected: 3 }],
+}
+const invert: ProblemHarness = {
+  entry: 'invertTree',
+  params: [{ name: 'root', type: 'tree-node<int>' }],
+  returns: 'tree-node<int>',
+  tests: [{ input: [[1, 2, 3]], expected: [1, 3, 2] }],
+}
+
+describe('tree-node codegen', () => {
+  it('JS builds a tree from level-order (nulls) and returns int', () => {
+    const p = buildProgram('javascript', 'function maxDepth(r){return r?1+Math.max(maxDepth(r.left),maxDepth(r.right)):0}', maxDepth, [[3, 9, 20, null, null, 15, 7]])
+    expect(p).toContain('function TreeNode')
+    expect(p).toContain('__toTree([3,9,20,null,null,15,7])')
+  })
+  it('Python injects TreeNode', () => {
+    const p = buildProgram('python', 'class Solution:\n    def maxDepth(self,r):\n        return 0', maxDepth, [[3, 9, 20, null, null, 15, 7]])
+    expect(p).toContain('class TreeNode')
+    expect(p).toContain('__to_tree([3,9,20,None,None,15,7])')
+  })
+  it('C++ renders nulls in the wire builder', () => {
+    const p = buildProgram('cpp', 'class Solution{public: int maxDepth(TreeNode* r){return 0;}};', maxDepth, [[3, 9, 20, null, null, 15, 7]])
+    expect(p).toContain('struct TreeNode')
+    expect(p).toContain('__toTree(')
+  })
+  it('Java uses a nullable Integer[] wire', () => {
+    const p = buildProgram('java', 'class Solution{ int maxDepth(TreeNode r){return 0;}}', maxDepth, [[3, 9, 20, null, null, 15, 7]])
+    expect(p).toContain('static class TreeNode')
+    expect(p).toContain('__toTree(new Integer[]{3,9,20,null,null,15,7})')
+  })
+  it('JS invert round-trips and serializes back to trimmed level-order (eval smoke)', () => {
+    const p = buildProgram('javascript', 'function invertTree(r){if(!r)return null;const t=r.left;r.left=invertTree(r.right);r.right=invertTree(t);return r}', invert, [[1, 2, 3]])
+    expect(outputMatches(evalJs(p), [1, 3, 2])).toBe(true)
+  })
+})
+
+const cloneGraph: ProblemHarness = {
+  entry: 'cloneGraph',
+  params: [{ name: 'node', type: 'graph-node<int>' }],
+  returns: 'graph-node<int>',
+  tests: [{ input: [[[2, 4], [1, 3], [2, 4], [1, 3]]], expected: [[2, 4], [1, 3], [2, 4], [1, 3]] }],
+}
+
+describe('graph-node codegen', () => {
+  it('JS builds the adjacency graph and serializes back', () => {
+    const p = buildProgram('javascript', 'function cloneGraph(n){return n}', cloneGraph, [[[2, 4], [1, 3], [2, 4], [1, 3]]])
+    expect(p).toContain('function Node')
+    expect(p).toContain('__toGraph([[2,4],[1,3],[2,4],[1,3]])')
+    expect(p).toContain('__fromGraph(')
+  })
+  it('JS clone-graph round-trips via identity (eval smoke)', () => {
+    const p = buildProgram('javascript', 'function cloneGraph(n){return n}', cloneGraph, [[[2, 4], [1, 3], [2, 4], [1, 3]]])
+    expect(outputMatches(evalJs(p), [[2, 4], [1, 3], [2, 4], [1, 3]])).toBe(true)
+  })
+  it('C++/Java/Python inject Node', () => {
+    expect(buildProgram('python', 'class Solution:\n    def cloneGraph(self,n):\n        return n', cloneGraph, [[[2, 4]]])).toContain('class Node')
+    expect(buildProgram('cpp', 'class Solution{public: Node* cloneGraph(Node* n){return n;}};', cloneGraph, [[[2, 4]]])).toContain('struct Node')
+    expect(buildProgram('java', 'class Solution{ Node cloneGraph(Node n){return n;}}', cloneGraph, [[[2, 4]]])).toContain('static class Node')
+  })
+})
+
+const mergeK: ProblemHarness = {
+  entry: 'mergeKLists',
+  params: [{ name: 'lists', type: 'array<list-node<int>>' }],
+  returns: 'list-node<int>',
+  tests: [{ input: [[[1, 4, 5], [1, 3, 4], [2, 6]]], expected: [1, 1, 2, 3, 4, 4, 5, 6] }],
+}
+
+describe('array<list-node> codegen', () => {
+  it('JS maps each inner array to a list', () => {
+    const p = buildProgram('javascript', 'function mergeKLists(ls){return ls[0]||null}', mergeK, [[[1, 4, 5], [1, 3, 4], [2, 6]]])
+    expect(p).toContain('.map((__x)=>__toList(__x))')
+    expect(p).toContain('__fromList(')
+  })
+  it('Python builds a list of lists', () => {
+    const p = buildProgram('python', 'class Solution:\n    def mergeKLists(self,ls):\n        return ls[0] if ls else None', mergeK, [[[1, 4, 5], [1, 3, 4], [2, 6]]])
+    expect(p).toContain('[__to_list(__x) for __x in')
+  })
+  it('C++ builds a vector<ListNode*>', () => {
+    const p = buildProgram('cpp', 'class Solution{public: ListNode* mergeKLists(vector<ListNode*>& ls){return ls.empty()?nullptr:ls[0];}};', mergeK, [[[1, 4, 5]]])
+    expect(p).toContain('vector<ListNode*> __a0')
+  })
+  it('Java builds a ListNode[]', () => {
+    const p = buildProgram('java', 'class Solution{ ListNode mergeKLists(ListNode[] ls){return ls.length==0?null:ls[0];}}', mergeK, [[[1, 4, 5]]])
+    expect(p).toContain('ListNode[] __a0')
+  })
+  it('JS array<list-node> merges end to end (eval smoke)', () => {
+    const p = buildProgram('javascript', 'function mergeKLists(ls){const a=[];for(const l of ls){let n=l;while(n){a.push(n.val);n=n.next;}}a.sort((x,y)=>x-y);let d={next:null},c=d;for(const v of a){c.next={val:v,next:null};c=c.next;}return d.next}', mergeK, [[[1, 4, 5], [1, 3, 4], [2, 6]]])
+    expect(outputMatches(evalJs(p), [1, 1, 2, 3, 4, 4, 5, 6])).toBe(true)
+  })
+})
+
+const minStack: ProblemHarness = {
+  entry: 'minStackOps',
+  params: [{ name: 'operations', type: 'operations' }],
+  returns: 'operations',
+  tests: [{
+    input: [[['MinStack', []], ['push', [-2]], ['push', [0]], ['getMin', []], ['pop', []], ['top', []]]],
+    expected: [null, null, null, -2, null, -2],
+  }],
+}
+const MIN_STACK_JS = 'class MinStack{constructor(){this.s=[]}push(x){this.s.push(x)}pop(){this.s.pop()}top(){return this.s[this.s.length-1]}getMin(){return Math.min(...this.s)}}'
+const MIN_STACK_PY = 'class MinStack:\n    def __init__(self):\n        self.s=[]\n    def push(self,x):\n        self.s.append(x)\n    def pop(self):\n        self.s.pop()\n    def top(self):\n        return self.s[-1]\n    def getMin(self):\n        return min(self.s)'
+
+describe('operations-mode codegen', () => {
+  it('JS instantiates the class and dispatches, collecting returns', () => {
+    const p = buildProgram('javascript', MIN_STACK_JS, minStack, [minStack.tests[0].input[0]])
+    expect(p).toContain('new MinStack(')
+    expect(p).toContain('JSON.stringify')
+  })
+  it('JS operations round-trip (eval smoke)', () => {
+    const p = buildProgram('javascript', MIN_STACK_JS, minStack, [minStack.tests[0].input[0]])
+    expect(outputMatches(evalJs(p), [null, null, null, -2, null, -2])).toBe(true)
+  })
+  it('Python dispatches by method name', () => {
+    const p = buildProgram('python', MIN_STACK_PY, minStack, [minStack.tests[0].input[0]])
+    expect(p).toContain('MinStack(')
+    expect(p).toContain('json.dumps')
+  })
+  it('C++/Java operations are deferred to SP4 (null program)', () => {
+    expect(buildProgram('cpp', 'class MinStack{};', minStack, [minStack.tests[0].input[0]])).toBeNull()
+    expect(buildProgram('java', 'class MinStack{}', minStack, [minStack.tests[0].input[0]])).toBeNull()
+  })
+})

@@ -1,0 +1,18 @@
+[
+  {
+    "id": "p-two-sum", "slug": "two-sum", "title": "Two Sum",
+    "difficulty": "easy", "category": "Arrays & Hashing", "tags": ["array"],
+    "sheet": "leetcode150", "sourceUrl": "https://leetcode.com/problems/two-sum/",
+    "description": "Return indices of two numbers adding to target.",
+    "examples": [{ "input": "nums=[2,7], target=9", "output": "[0,1]" }],
+    "constraints": "2 <= n <= 1e4",
+    "supportedLanguages": ["javascript", "python", "java", "cpp"],
+    "starterCode": { "javascript": "function twoSum(nums,target){}" },
+    "harness": {
+      "entry": "twoSum",
+      "params": [{ "name": "nums", "type": "int[]" }, { "name": "target", "type": "int" }],
+      "returns": "int[]", "judge": "unordered",
+      "tests": [{ "input": [[2,7], 9], "expected": [0,1] }]
+    }
+  }
+]
