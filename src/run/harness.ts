@@ -209,7 +209,24 @@ function argExpr(language: string, tag: TypeTag, value: unknown): string {
     const lit = argExpr(language, { kind: 'scalar', elem: 'int[][]' }, value)
     return language === 'python' ? `__to_graph(${lit})` : `__toGraph(${lit})`
   }
-  // array / operations added in later tasks.
+  if (tag.kind === 'array') {
+    if (tag.of.kind === 'list-node') {
+      const inner = asArr(value)
+      const intArr = { kind: 'scalar', elem: 'int[]' } as const
+      switch (language) {
+        case 'javascript':
+          return `[${inner.map((x) => argExpr('javascript', intArr, x)).join(',')}].map((__x)=>__toList(__x))`
+        case 'python':
+          return `[__to_list(__x) for __x in [${inner.map((x) => argExpr('python', intArr, x)).join(',')}]]`
+        case 'cpp':
+          return `vector<ListNode*>{${inner.map((x) => `__toList(${argExpr('cpp', intArr, x)})`).join(', ')}}`
+        case 'java':
+          return `new ListNode[]{${inner.map((x) => `__toList(${argExpr('java', intArr, x)})`).join(', ')}}`
+      }
+    }
+    throw new Error(`Unsupported array element type: ${tag.of.kind}`)
+  }
+  // operations handled by a separate driver (see buildProgram).
   return argExpr(language, { kind: 'scalar', elem: 'int[]' }, value)
 }
 
@@ -262,12 +279,14 @@ function cppDeclType(tag: TypeTag, raw: string): string {
   if (tag.kind === 'list-node') return 'ListNode*'
   if (tag.kind === 'tree-node') return 'TreeNode*'
   if (tag.kind === 'graph-node') return 'Node*'
+  if (tag.kind === 'array' && tag.of.kind === 'list-node') return 'vector<ListNode*>'
   return CPP_TYPE[raw] ?? 'auto'
 }
 function javaDeclType(tag: TypeTag, raw: string): string {
   if (tag.kind === 'list-node') return 'ListNode'
   if (tag.kind === 'tree-node') return 'TreeNode'
   if (tag.kind === 'graph-node') return 'Node'
+  if (tag.kind === 'array' && tag.of.kind === 'list-node') return 'ListNode[]'
   return JAVA_TYPE[raw] ?? 'var'
 }
 

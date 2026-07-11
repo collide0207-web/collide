@@ -177,3 +177,34 @@ describe('graph-node codegen', () => {
     expect(buildProgram('java', 'class Solution{ Node cloneGraph(Node n){return n;}}', cloneGraph, [[[2, 4]]])).toContain('static class Node')
   })
 })
+
+const mergeK: ProblemHarness = {
+  entry: 'mergeKLists',
+  params: [{ name: 'lists', type: 'array<list-node<int>>' }],
+  returns: 'list-node<int>',
+  tests: [{ input: [[[1, 4, 5], [1, 3, 4], [2, 6]]], expected: [1, 1, 2, 3, 4, 4, 5, 6] }],
+}
+
+describe('array<list-node> codegen', () => {
+  it('JS maps each inner array to a list', () => {
+    const p = buildProgram('javascript', 'function mergeKLists(ls){return ls[0]||null}', mergeK, [[[1, 4, 5], [1, 3, 4], [2, 6]]])
+    expect(p).toContain('.map((__x)=>__toList(__x))')
+    expect(p).toContain('__fromList(')
+  })
+  it('Python builds a list of lists', () => {
+    const p = buildProgram('python', 'class Solution:\n    def mergeKLists(self,ls):\n        return ls[0] if ls else None', mergeK, [[[1, 4, 5], [1, 3, 4], [2, 6]]])
+    expect(p).toContain('[__to_list(__x) for __x in')
+  })
+  it('C++ builds a vector<ListNode*>', () => {
+    const p = buildProgram('cpp', 'class Solution{public: ListNode* mergeKLists(vector<ListNode*>& ls){return ls.empty()?nullptr:ls[0];}};', mergeK, [[[1, 4, 5]]])
+    expect(p).toContain('vector<ListNode*> __a0')
+  })
+  it('Java builds a ListNode[]', () => {
+    const p = buildProgram('java', 'class Solution{ ListNode mergeKLists(ListNode[] ls){return ls.length==0?null:ls[0];}}', mergeK, [[[1, 4, 5]]])
+    expect(p).toContain('ListNode[] __a0')
+  })
+  it('JS array<list-node> merges end to end (eval smoke)', () => {
+    const p = buildProgram('javascript', 'function mergeKLists(ls){const a=[];for(const l of ls){let n=l;while(n){a.push(n.val);n=n.next;}}a.sort((x,y)=>x-y);let d={next:null},c=d;for(const v of a){c.next={val:v,next:null};c=c.next;}return d.next}', mergeK, [[[1, 4, 5], [1, 3, 4], [2, 6]]])
+    expect(outputMatches(evalJs(p), [1, 1, 2, 3, 4, 4, 5, 6])).toBe(true)
+  })
+})
