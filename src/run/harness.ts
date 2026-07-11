@@ -184,13 +184,96 @@ function javaPrint(returns: string, expr: string): string {
   }
 }
 
+// --- object-type codegen hooks --------------------------------------------------
+
+/** Expression passed as the i-th argument. Scalars reuse the literal bakers; object
+ *  types wrap the wire literal in a deserializer defined by the prelude. */
+function argExpr(language: string, tag: TypeTag, value: unknown): string {
+  if (tag.kind === 'scalar') {
+    switch (language) {
+      case 'javascript': return jsLiteral(tag.elem, value)
+      case 'python': return pyLiteral(tag.elem, value)
+      case 'cpp': return cppLiteral(tag.elem, value)
+      case 'java': return javaLiteral(tag.elem, value)
+    }
+  }
+  if (tag.kind === 'list-node') {
+    const lit = argExpr(language, { kind: 'scalar', elem: 'int[]' }, value)
+    return language === 'python' ? `__to_list(${lit})` : `__toList(${lit})`
+  }
+  // tree-node / graph-node / array / operations added in later tasks.
+  return argExpr(language, { kind: 'scalar', elem: 'int[]' }, value)
+}
+
+/** JS/Py: the expression fed to the printer, mapping object returns through a serializer. */
+function printExprJs(tag: TypeTag, expr: string): string {
+  if (tag.kind === 'list-node') return `__fromList(${expr})`
+  return expr
+}
+function printExprPy(tag: TypeTag, expr: string): string {
+  if (tag.kind === 'list-node') return `__from_list(${expr})`
+  return expr
+}
+
+/** C++/Java: the full print statement. Object serializers already yield canonical JSON
+ *  strings, so print them directly; scalars/arrays fall through to the existing printers. */
+function cppPrintTag(tag: TypeTag, returns: string, expr: string): string {
+  if (tag.kind === 'list-node') return `cout << __fromList(${expr});`
+  return cppPrint(returns, expr)
+}
+function javaPrintTag(tag: TypeTag, returns: string, expr: string): string {
+  if (tag.kind === 'list-node') return `System.out.print(__fromList(${expr}));`
+  return javaPrint(returns, expr)
+}
+
+/** Declared local type for the i-th argument (object types become pointers/refs). */
+function cppDeclType(tag: TypeTag, raw: string): string {
+  if (tag.kind === 'list-node') return 'ListNode*'
+  return CPP_TYPE[raw] ?? 'auto'
+}
+function javaDeclType(tag: TypeTag, raw: string): string {
+  if (tag.kind === 'list-node') return 'ListNode'
+  return JAVA_TYPE[raw] ?? 'var'
+}
+
+/** True if any param or the return uses `kind` (recursing into `array<…>`). */
+function usesKind(h: ProblemHarness, kind: TypeTag['kind']): boolean {
+  const hit = (t: TypeTag): boolean => t.kind === kind || (t.kind === 'array' && hit(t.of))
+  return h.params.some((p) => hit(parseType(p.type))) || hit(parseType(h.returns))
+}
+
+// --- injected preludes ----------------------------------------------------------
+
+const LIST_PRELUDE: Record<string, string> = {
+  javascript:
+    'function ListNode(val, next){ this.val = val===undefined?0:val; this.next = next===undefined?null:next; }\n' +
+    'function __toList(a){ let d=new ListNode(0), c=d; for(const x of a){ c.next=new ListNode(x); c=c.next; } return d.next; }\n' +
+    'function __fromList(n){ const r=[]; while(n){ r.push(n.val); n=n.next; } return r; }\n\n',
+  python:
+    'class ListNode:\n    def __init__(self, val=0, next=None):\n        self.val=val; self.next=next\n' +
+    'def __to_list(a):\n    d=ListNode(0); c=d\n    for x in a:\n        c.next=ListNode(x); c=c.next\n    return d.next\n' +
+    'def __from_list(n):\n    r=[]\n    while n:\n        r.append(n.val); n=n.next\n    return r\n\n',
+  cpp:
+    'struct ListNode { int val; ListNode* next; ListNode(int x):val(x),next(nullptr){} };\n' +
+    'static ListNode* __toList(vector<int> a){ ListNode d(0); ListNode* c=&d; for(int x:a){ c->next=new ListNode(x); c=c->next; } return d.next; }\n' +
+    'static string __fromList(ListNode* n){ string s="["; bool f=true; while(n){ if(!f) s+=","; s+=to_string(n->val); f=false; n=n->next; } s+="]"; return s; }\n\n',
+  java:
+    'static class ListNode { int val; ListNode next; ListNode(int x){ val=x; } }\n' +
+    'static ListNode __toList(int[] a){ ListNode d=new ListNode(0), c=d; for(int x:a){ c.next=new ListNode(x); c=c.next; } return d.next; }\n' +
+    'static String __fromList(ListNode n){ StringBuilder b=new StringBuilder("["); boolean f=true; while(n!=null){ if(!f) b.append(","); b.append(n.val); f=false; n=n.next; } b.append("]"); return b.toString(); }\n\n',
+}
+
 // --- program builders -----------------------------------------------------------
 
 /** Per-language type definitions + (de)serializers injected ahead of the driver.
- *  Empty until the per-type tasks fill it in. `userCode` lets us skip a definition the
- *  user already provides (mirrors the #include/import guards below). */
-function preludeFor(_language: string, _h: ProblemHarness, _userCode: string): string {
-  return ''
+ *  `userCode` lets us skip a definition the user already provides (mirrors the
+ *  #include/import guards in buildProgram). */
+function preludeFor(language: string, h: ProblemHarness, userCode: string): string {
+  let out = ''
+  if (usesKind(h, 'list-node') && !/\b(class|struct)\s+ListNode\b/.test(userCode)) {
+    out += LIST_PRELUDE[language] ?? ''
+  }
+  return out
 }
 
 /**
@@ -204,25 +287,25 @@ export function buildProgram(
   h: ProblemHarness,
   args: unknown[],
 ): string | null {
-  const types = h.params.map((p) => p.type)
+  const retTag = parseType(h.returns)
 
   switch (language) {
     case 'javascript': {
       const prelude = preludeFor('javascript', h, userCode)
-      const call = `${h.entry}(${args.map((a, i) => jsLiteral(types[i], a)).join(', ')})`
-      return `${prelude}${userCode}\n\n;(function(){ console.log(JSON.stringify(${call})); })();\n`
+      const call = `${h.entry}(${h.params.map((p, i) => argExpr('javascript', parseType(p.type), args[i])).join(', ')})`
+      return `${prelude}${userCode}\n\n;(function(){ console.log(JSON.stringify(${printExprJs(retTag, call)})); })();\n`
     }
     case 'python': {
       const prelude = preludeFor('python', h, userCode)
-      const call = `Solution().${h.entry}(${args.map((a, i) => pyLiteral(types[i], a)).join(', ')})`
-      return `${prelude}${userCode}\n\nimport json\nprint(json.dumps(${call}, separators=(',', ':')))\n`
+      const call = `Solution().${h.entry}(${h.params.map((p, i) => argExpr('python', parseType(p.type), args[i])).join(', ')})`
+      return `${prelude}${userCode}\n\nimport json\nprint(json.dumps(${printExprPy(retTag, call)}, separators=(',', ':')))\n`
     }
     case 'cpp': {
       const decls = h.params
-        .map((p, i) => `    ${CPP_TYPE[p.type] ?? 'auto'} __a${i} = ${cppLiteral(p.type, args[i])};`)
+        .map((p, i) => `    ${cppDeclType(parseType(p.type), p.type)} __a${i} = ${argExpr('cpp', parseType(p.type), args[i])};`)
         .join('\n')
       const callArgs = h.params.map((_, i) => `__a${i}`).join(', ')
-      const print = cppPrint(h.returns, `__sol.${h.entry}(${callArgs})`)
+      const print = cppPrintTag(retTag, h.returns, `__sol.${h.entry}(${callArgs})`)
       // Guarantee the driver's includes even if the user's saved code stripped them
       // (a bare `class Solution` won't compile against the generated main otherwise).
       const includes = /#include\s*<bits\/stdc\+\+\.h>/.test(userCode) ? '' : '#include <bits/stdc++.h>\nusing namespace std;\n\n'
@@ -231,10 +314,10 @@ export function buildProgram(
     }
     case 'java': {
       const decls = h.params
-        .map((p, i) => `        ${JAVA_TYPE[p.type] ?? 'var'} __a${i} = ${javaLiteral(p.type, args[i])};`)
+        .map((p, i) => `        ${javaDeclType(parseType(p.type), p.type)} __a${i} = ${argExpr('java', parseType(p.type), args[i])};`)
         .join('\n')
       const callArgs = h.params.map((_, i) => `__a${i}`).join(', ')
-      const print = javaPrint(h.returns, `__sol.${h.entry}(${callArgs})`)
+      const print = javaPrintTag(retTag, h.returns, `__sol.${h.entry}(${callArgs})`)
       // Imports must precede the class; prepend java.util if the user's code lacks it.
       const imports = /import\s+java\.util/.test(userCode) ? '' : 'import java.util.*;\n\n'
       const prelude = preludeFor('java', h, userCode)

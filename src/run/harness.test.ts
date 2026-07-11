@@ -65,3 +65,50 @@ describe('parseType', () => {
     expect(parseType('array<list-node<int>>')).toEqual({ kind: 'array', of: { kind: 'list-node', elem: 'int' } })
   })
 })
+
+const reverseList: ProblemHarness = {
+  entry: 'reverseList',
+  params: [{ name: 'head', type: 'list-node<int>' }],
+  returns: 'list-node<int>',
+  tests: [{ input: [[1, 2, 3]], expected: [3, 2, 1] }],
+}
+
+function evalJs(program: string | null): string {
+  expect(program).not.toBeNull()
+  let out = ''
+  const log = console.log
+  console.log = (s: string) => { out += s }
+  try { new Function(program!)() } finally { console.log = log }
+  return out
+}
+
+describe('list-node codegen', () => {
+  it('JS builds a list from the array and prints it back as an array', () => {
+    const p = buildProgram('javascript', 'function reverseList(head){return head}', reverseList, [[1, 2, 3]])
+    expect(p).toContain('function ListNode')
+    expect(p).toContain('__toList([1,2,3])')
+    expect(p).toContain('__fromList(')
+  })
+  it('Python injects ListNode and (de)serializers', () => {
+    const p = buildProgram('python', 'class Solution:\n    def reverseList(self,head):\n        return head', reverseList, [[1, 2, 3]])
+    expect(p).toContain('class ListNode')
+    expect(p).toContain('__to_list([1,2,3])')
+    expect(p).toContain('__from_list(')
+  })
+  it('C++ injects ListNode + builds/serializes', () => {
+    const p = buildProgram('cpp', 'class Solution{public: ListNode* reverseList(ListNode* h){return h;}};', reverseList, [[1, 2, 3]])
+    expect(p).toContain('struct ListNode')
+    expect(p).toContain('__toList({1,2,3})')
+    expect(p).toContain('__fromList(')
+  })
+  it('Java injects ListNode + builds/serializes', () => {
+    const p = buildProgram('java', 'class Solution{ ListNode reverseList(ListNode h){return h;}}', reverseList, [[1, 2, 3]])
+    expect(p).toContain('static class ListNode')
+    expect(p).toContain('__toList(new int[]{1,2,3})')
+    expect(p).toContain('__fromList(')
+  })
+  it('JS list-node round-trips through a real reverse (eval smoke)', () => {
+    const p = buildProgram('javascript', 'function reverseList(head){let prev=null;while(head){const n=head.next;head.next=prev;prev=head;head=n;}return prev}', reverseList, [[1, 2, 3]])
+    expect(outputMatches(evalJs(p), [3, 2, 1])).toBe(true)
+  })
+})
