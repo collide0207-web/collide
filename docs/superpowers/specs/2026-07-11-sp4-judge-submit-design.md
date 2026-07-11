@@ -159,7 +159,13 @@ behaviourally identical and are tested against the same fixtures.
 ## 8. Verification constraints in the target environment (honest)
 
 - ✅ Backend compiles (`./gradlew build`); judge golden tests run for **JavaScript and Java**
-  end-to-end (compile-once → per-case run → checker → verdict), proving AC/WA/TLE for real.
+  end-to-end (compile-once → per-case run → checker → verdict), proving AC/WA/CE for real.
+- ✅ **TLE is proven via the enforcement mechanism** — a deliberately slow solution is killed by
+  the per-case wall-clock guard and reported `TLE` (deterministic, load-independent). Note: the
+  pilot bundles top out at n≈5000, too small for an O(n²) solution to blow a realistic clock, so
+  *algorithmic-scale* TLE (O(n²) at the constraint ceiling) needs a larger-n bundle than the pilot
+  ships — the generator framework supports it; only the pilot's `n_max` is small. The judge's TLE
+  path itself is fully verified.
 - ✅ Checker + driver-codegen + verdict-aggregation unit tests run.
 - ✅ Frontend `tsc` + `vitest` + `build` green; Submit UX exercised against `mockApi`.
 - ⚠️ **Python and C++ drivers are generated and string-asserted but not executed** — g++/python3
