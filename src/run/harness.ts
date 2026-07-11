@@ -201,17 +201,38 @@ function argExpr(language: string, tag: TypeTag, value: unknown): string {
     const lit = argExpr(language, { kind: 'scalar', elem: 'int[]' }, value)
     return language === 'python' ? `__to_list(${lit})` : `__toList(${lit})`
   }
-  // tree-node / graph-node / array / operations added in later tasks.
+  if (tag.kind === 'tree-node') {
+    const lit = nullableWire(language, value)
+    return language === 'python' ? `__to_tree(${lit})` : `__toTree(${lit})`
+  }
+  // graph-node / array / operations added in later tasks.
   return argExpr(language, { kind: 'scalar', elem: 'int[]' }, value)
+}
+
+/** Literal for a wire array that may contain nulls (tree level-order / graph guards). */
+function nullableWire(language: string, v: unknown): string {
+  const a = asArr(v)
+  switch (language) {
+    case 'javascript': return `[${a.map((x) => (x == null ? 'null' : String(x))).join(',')}]`
+    case 'python': return `[${a.map((x) => (x == null ? 'None' : String(x))).join(',')}]`
+    // C++: build a vector<int>; encode null as the INT_MIN sentinel (__NUL), which
+    // __toTree treats as "no node". Real node values never reach INT_MIN.
+    case 'cpp': return `{${a.map((x) => (x == null ? '__NUL' : String(x))).join(',')}}`
+    // Java: genuine null flows through an Integer[].
+    case 'java': return `new Integer[]{${a.map((x) => (x == null ? 'null' : String(x))).join(',')}}`
+    default: return '[]'
+  }
 }
 
 /** JS/Py: the expression fed to the printer, mapping object returns through a serializer. */
 function printExprJs(tag: TypeTag, expr: string): string {
   if (tag.kind === 'list-node') return `__fromList(${expr})`
+  if (tag.kind === 'tree-node') return `__fromTree(${expr})`
   return expr
 }
 function printExprPy(tag: TypeTag, expr: string): string {
   if (tag.kind === 'list-node') return `__from_list(${expr})`
+  if (tag.kind === 'tree-node') return `__from_tree(${expr})`
   return expr
 }
 
@@ -219,20 +240,24 @@ function printExprPy(tag: TypeTag, expr: string): string {
  *  strings, so print them directly; scalars/arrays fall through to the existing printers. */
 function cppPrintTag(tag: TypeTag, returns: string, expr: string): string {
   if (tag.kind === 'list-node') return `cout << __fromList(${expr});`
+  if (tag.kind === 'tree-node') return `cout << __fromTree(${expr});`
   return cppPrint(returns, expr)
 }
 function javaPrintTag(tag: TypeTag, returns: string, expr: string): string {
   if (tag.kind === 'list-node') return `System.out.print(__fromList(${expr}));`
+  if (tag.kind === 'tree-node') return `System.out.print(__fromTree(${expr}));`
   return javaPrint(returns, expr)
 }
 
 /** Declared local type for the i-th argument (object types become pointers/refs). */
 function cppDeclType(tag: TypeTag, raw: string): string {
   if (tag.kind === 'list-node') return 'ListNode*'
+  if (tag.kind === 'tree-node') return 'TreeNode*'
   return CPP_TYPE[raw] ?? 'auto'
 }
 function javaDeclType(tag: TypeTag, raw: string): string {
   if (tag.kind === 'list-node') return 'ListNode'
+  if (tag.kind === 'tree-node') return 'TreeNode'
   return JAVA_TYPE[raw] ?? 'var'
 }
 
@@ -263,6 +288,47 @@ const LIST_PRELUDE: Record<string, string> = {
     'static String __fromList(ListNode n){ StringBuilder b=new StringBuilder("["); boolean f=true; while(n!=null){ if(!f) b.append(","); b.append(n.val); f=false; n=n.next; } b.append("]"); return b.toString(); }\n\n',
 }
 
+const TREE_PRELUDE: Record<string, string> = {
+  javascript:
+    'function TreeNode(val,left,right){ this.val=val===undefined?0:val; this.left=left||null; this.right=right||null; }\n' +
+    'function __toTree(a){ if(!a.length||a[0]==null) return null; const root=new TreeNode(a[0]); const q=[root]; let i=1;\n' +
+    '  while(q.length&&i<a.length){ const n=q.shift();\n' +
+    '    if(i<a.length){ const v=a[i++]; if(v!=null){ n.left=new TreeNode(v); q.push(n.left); } }\n' +
+    '    if(i<a.length){ const v=a[i++]; if(v!=null){ n.right=new TreeNode(v); q.push(n.right); } } }\n' +
+    '  return root; }\n' +
+    'function __fromTree(root){ const out=[]; const q=[root]; while(q.length){ const n=q.shift(); if(n){ out.push(n.val); q.push(n.left,n.right); } else out.push(null); }\n' +
+    '  while(out.length && out[out.length-1]==null) out.pop(); return out; }\n\n',
+  python:
+    'class TreeNode:\n    def __init__(self, val=0, left=None, right=None):\n        self.val=val; self.left=left; self.right=right\n' +
+    'def __to_tree(a):\n    if not a or a[0] is None: return None\n    root=TreeNode(a[0]); q=[root]; i=1\n' +
+    '    while q and i<len(a):\n        n=q.pop(0)\n' +
+    '        if i<len(a):\n            v=a[i]; i+=1\n            if v is not None: n.left=TreeNode(v); q.append(n.left)\n' +
+    '        if i<len(a):\n            v=a[i]; i+=1\n            if v is not None: n.right=TreeNode(v); q.append(n.right)\n    return root\n' +
+    'def __from_tree(root):\n    out=[]; q=[root]\n    while q:\n        n=q.pop(0)\n        if n: out.append(n.val); q.append(n.left); q.append(n.right)\n        else: out.append(None)\n' +
+    '    while out and out[-1] is None: out.pop()\n    return out\n\n',
+  cpp:
+    'static const int __NUL = INT_MIN;\n' +
+    'struct TreeNode { int val; TreeNode* left; TreeNode* right; TreeNode(int x):val(x),left(nullptr),right(nullptr){} };\n' +
+    'static TreeNode* __toTree(vector<int> a){ if(a.empty()||a[0]==__NUL) return nullptr; TreeNode* root=new TreeNode(a[0]); queue<TreeNode*> q; q.push(root); size_t i=1;\n' +
+    '  while(!q.empty()&&i<a.size()){ TreeNode* n=q.front(); q.pop();\n' +
+    '    if(i<a.size()){ int v=a[i++]; if(v!=__NUL){ n->left=new TreeNode(v); q.push(n->left); } }\n' +
+    '    if(i<a.size()){ int v=a[i++]; if(v!=__NUL){ n->right=new TreeNode(v); q.push(n->right); } } }\n' +
+    '  return root; }\n' +
+    'static string __fromTree(TreeNode* root){ vector<string> out; queue<TreeNode*> q; q.push(root);\n' +
+    '  while(!q.empty()){ TreeNode* n=q.front(); q.pop(); if(n){ out.push_back(to_string(n->val)); q.push(n->left); q.push(n->right); } else out.push_back("null"); }\n' +
+    '  while(!out.empty()&&out.back()=="null") out.pop_back(); string s="["; for(size_t i=0;i<out.size();++i){ if(i) s+=","; s+=out[i]; } s+="]"; return s; }\n\n',
+  java:
+    'static class TreeNode { int val; TreeNode left, right; TreeNode(int x){ val=x; } }\n' +
+    'static TreeNode __toTree(Integer[] a){ if(a.length==0||a[0]==null) return null; TreeNode root=new TreeNode(a[0]); java.util.Queue<TreeNode> q=new java.util.LinkedList<>(); q.add(root); int i=1;\n' +
+    '  while(!q.isEmpty()&&i<a.length){ TreeNode n=q.poll();\n' +
+    '    if(i<a.length){ Integer v=a[i++]; if(v!=null){ n.left=new TreeNode(v); q.add(n.left); } }\n' +
+    '    if(i<a.length){ Integer v=a[i++]; if(v!=null){ n.right=new TreeNode(v); q.add(n.right); } } }\n' +
+    '  return root; }\n' +
+    'static String __fromTree(TreeNode root){ java.util.List<String> out=new java.util.ArrayList<>(); java.util.Queue<TreeNode> q=new java.util.LinkedList<>(); q.add(root);\n' +
+    '  while(!q.isEmpty()){ TreeNode n=q.poll(); if(n!=null){ out.add(String.valueOf(n.val)); q.add(n.left); q.add(n.right); } else out.add("null"); }\n' +
+    '  while(!out.isEmpty()&&out.get(out.size()-1).equals("null")) out.remove(out.size()-1); return "["+String.join(",",out)+"]"; }\n\n',
+}
+
 // --- program builders -----------------------------------------------------------
 
 /** Per-language type definitions + (de)serializers injected ahead of the driver.
@@ -272,6 +338,9 @@ function preludeFor(language: string, h: ProblemHarness, userCode: string): stri
   let out = ''
   if (usesKind(h, 'list-node') && !/\b(class|struct)\s+ListNode\b/.test(userCode)) {
     out += LIST_PRELUDE[language] ?? ''
+  }
+  if (usesKind(h, 'tree-node') && !/\b(class|struct)\s+TreeNode\b/.test(userCode)) {
+    out += TREE_PRELUDE[language] ?? ''
   }
   return out
 }

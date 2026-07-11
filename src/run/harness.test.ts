@@ -112,3 +112,43 @@ describe('list-node codegen', () => {
     expect(outputMatches(evalJs(p), [3, 2, 1])).toBe(true)
   })
 })
+
+const maxDepth: ProblemHarness = {
+  entry: 'maxDepth',
+  params: [{ name: 'root', type: 'tree-node<int>' }],
+  returns: 'int',
+  tests: [{ input: [[3, 9, 20, null, null, 15, 7]], expected: 3 }],
+}
+const invert: ProblemHarness = {
+  entry: 'invertTree',
+  params: [{ name: 'root', type: 'tree-node<int>' }],
+  returns: 'tree-node<int>',
+  tests: [{ input: [[1, 2, 3]], expected: [1, 3, 2] }],
+}
+
+describe('tree-node codegen', () => {
+  it('JS builds a tree from level-order (nulls) and returns int', () => {
+    const p = buildProgram('javascript', 'function maxDepth(r){return r?1+Math.max(maxDepth(r.left),maxDepth(r.right)):0}', maxDepth, [[3, 9, 20, null, null, 15, 7]])
+    expect(p).toContain('function TreeNode')
+    expect(p).toContain('__toTree([3,9,20,null,null,15,7])')
+  })
+  it('Python injects TreeNode', () => {
+    const p = buildProgram('python', 'class Solution:\n    def maxDepth(self,r):\n        return 0', maxDepth, [[3, 9, 20, null, null, 15, 7]])
+    expect(p).toContain('class TreeNode')
+    expect(p).toContain('__to_tree([3,9,20,None,None,15,7])')
+  })
+  it('C++ renders nulls in the wire builder', () => {
+    const p = buildProgram('cpp', 'class Solution{public: int maxDepth(TreeNode* r){return 0;}};', maxDepth, [[3, 9, 20, null, null, 15, 7]])
+    expect(p).toContain('struct TreeNode')
+    expect(p).toContain('__toTree(')
+  })
+  it('Java uses a nullable Integer[] wire', () => {
+    const p = buildProgram('java', 'class Solution{ int maxDepth(TreeNode r){return 0;}}', maxDepth, [[3, 9, 20, null, null, 15, 7]])
+    expect(p).toContain('static class TreeNode')
+    expect(p).toContain('__toTree(new Integer[]{3,9,20,null,null,15,7})')
+  })
+  it('JS invert round-trips and serializes back to trimmed level-order (eval smoke)', () => {
+    const p = buildProgram('javascript', 'function invertTree(r){if(!r)return null;const t=r.left;r.left=invertTree(r.right);r.right=invertTree(t);return r}', invert, [[1, 2, 3]])
+    expect(outputMatches(evalJs(p), [1, 3, 2])).toBe(true)
+  })
+})
