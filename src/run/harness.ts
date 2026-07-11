@@ -205,7 +205,11 @@ function argExpr(language: string, tag: TypeTag, value: unknown): string {
     const lit = nullableWire(language, value)
     return language === 'python' ? `__to_tree(${lit})` : `__toTree(${lit})`
   }
-  // graph-node / array / operations added in later tasks.
+  if (tag.kind === 'graph-node') {
+    const lit = argExpr(language, { kind: 'scalar', elem: 'int[][]' }, value)
+    return language === 'python' ? `__to_graph(${lit})` : `__toGraph(${lit})`
+  }
+  // array / operations added in later tasks.
   return argExpr(language, { kind: 'scalar', elem: 'int[]' }, value)
 }
 
@@ -228,11 +232,13 @@ function nullableWire(language: string, v: unknown): string {
 function printExprJs(tag: TypeTag, expr: string): string {
   if (tag.kind === 'list-node') return `__fromList(${expr})`
   if (tag.kind === 'tree-node') return `__fromTree(${expr})`
+  if (tag.kind === 'graph-node') return `__fromGraph(${expr})`
   return expr
 }
 function printExprPy(tag: TypeTag, expr: string): string {
   if (tag.kind === 'list-node') return `__from_list(${expr})`
   if (tag.kind === 'tree-node') return `__from_tree(${expr})`
+  if (tag.kind === 'graph-node') return `__from_graph(${expr})`
   return expr
 }
 
@@ -241,11 +247,13 @@ function printExprPy(tag: TypeTag, expr: string): string {
 function cppPrintTag(tag: TypeTag, returns: string, expr: string): string {
   if (tag.kind === 'list-node') return `cout << __fromList(${expr});`
   if (tag.kind === 'tree-node') return `cout << __fromTree(${expr});`
+  if (tag.kind === 'graph-node') return `cout << __fromGraph(${expr});`
   return cppPrint(returns, expr)
 }
 function javaPrintTag(tag: TypeTag, returns: string, expr: string): string {
   if (tag.kind === 'list-node') return `System.out.print(__fromList(${expr}));`
   if (tag.kind === 'tree-node') return `System.out.print(__fromTree(${expr}));`
+  if (tag.kind === 'graph-node') return `System.out.print(__fromGraph(${expr}));`
   return javaPrint(returns, expr)
 }
 
@@ -253,11 +261,13 @@ function javaPrintTag(tag: TypeTag, returns: string, expr: string): string {
 function cppDeclType(tag: TypeTag, raw: string): string {
   if (tag.kind === 'list-node') return 'ListNode*'
   if (tag.kind === 'tree-node') return 'TreeNode*'
+  if (tag.kind === 'graph-node') return 'Node*'
   return CPP_TYPE[raw] ?? 'auto'
 }
 function javaDeclType(tag: TypeTag, raw: string): string {
   if (tag.kind === 'list-node') return 'ListNode'
   if (tag.kind === 'tree-node') return 'TreeNode'
+  if (tag.kind === 'graph-node') return 'Node'
   return JAVA_TYPE[raw] ?? 'var'
 }
 
@@ -329,6 +339,39 @@ const TREE_PRELUDE: Record<string, string> = {
     '  while(!out.isEmpty()&&out.get(out.size()-1).equals("null")) out.remove(out.size()-1); return "["+String.join(",",out)+"]"; }\n\n',
 }
 
+const GRAPH_PRELUDE: Record<string, string> = {
+  javascript:
+    'function Node(val, neighbors){ this.val=val===undefined?0:val; this.neighbors=neighbors||[]; }\n' +
+    'function __toGraph(adj){ if(!adj.length) return null; const nodes=adj.map((_,i)=>new Node(i+1));\n' +
+    '  adj.forEach((nb,i)=>{ nodes[i].neighbors = nb.map((v)=>nodes[v-1]); }); return nodes[0]; }\n' +
+    'function __fromGraph(node){ if(!node) return []; const seen=new Map(); const q=[node]; seen.set(node.val,node);\n' +
+    '  while(q.length){ const n=q.shift(); for(const m of n.neighbors){ if(!seen.has(m.val)){ seen.set(m.val,m); q.push(m); } } }\n' +
+    '  const vals=[...seen.keys()].sort((a,b)=>a-b); return vals.map((v)=>seen.get(v).neighbors.map((m)=>m.val).sort((a,b)=>a-b)); }\n\n',
+  python:
+    'class Node:\n    def __init__(self, val=0, neighbors=None):\n        self.val=val; self.neighbors=neighbors if neighbors else []\n' +
+    'def __to_graph(adj):\n    if not adj: return None\n    nodes=[Node(i+1) for i in range(len(adj))]\n' +
+    '    for i,nb in enumerate(adj):\n        nodes[i].neighbors=[nodes[v-1] for v in nb]\n    return nodes[0]\n' +
+    'def __from_graph(node):\n    if not node: return []\n    seen={node.val:node}; q=[node]\n' +
+    '    while q:\n        n=q.pop(0)\n        for m in n.neighbors:\n            if m.val not in seen: seen[m.val]=m; q.append(m)\n' +
+    '    return [sorted(x.val for x in seen[v].neighbors) for v in sorted(seen)]\n\n',
+  cpp:
+    'struct Node { int val; vector<Node*> neighbors; Node(int x):val(x){} };\n' +
+    'static Node* __toGraph(vector<vector<int>> adj){ if(adj.empty()) return nullptr; vector<Node*> nodes; for(size_t i=0;i<adj.size();++i) nodes.push_back(new Node(i+1));\n' +
+    '  for(size_t i=0;i<adj.size();++i) for(int v:adj[i]) nodes[i]->neighbors.push_back(nodes[v-1]); return nodes[0]; }\n' +
+    'static string __fromGraph(Node* node){ if(!node) return "[]"; map<int,Node*> seen; queue<Node*> q; q.push(node); seen[node->val]=node;\n' +
+    '  while(!q.empty()){ Node* n=q.front(); q.pop(); for(Node* m:n->neighbors) if(!seen.count(m->val)){ seen[m->val]=m; q.push(m); } }\n' +
+    '  string s="["; bool f1=true; for(auto& kv:seen){ if(!f1) s+=","; f1=false; vector<int> vs; for(Node* m:kv.second->neighbors) vs.push_back(m->val); sort(vs.begin(),vs.end());\n' +
+    '    s+="["; for(size_t i=0;i<vs.size();++i){ if(i) s+=","; s+=to_string(vs[i]); } s+="]"; } s+="]"; return s; }\n\n',
+  java:
+    'static class Node { int val; java.util.List<Node> neighbors=new java.util.ArrayList<>(); Node(int x){ val=x; } }\n' +
+    'static Node __toGraph(int[][] adj){ if(adj.length==0) return null; Node[] nodes=new Node[adj.length]; for(int i=0;i<adj.length;i++) nodes[i]=new Node(i+1);\n' +
+    '  for(int i=0;i<adj.length;i++) for(int v:adj[i]) nodes[i].neighbors.add(nodes[v-1]); return nodes[0]; }\n' +
+    'static String __fromGraph(Node node){ if(node==null) return "[]"; java.util.TreeMap<Integer,Node> seen=new java.util.TreeMap<>(); java.util.Queue<Node> q=new java.util.LinkedList<>(); q.add(node); seen.put(node.val,node);\n' +
+    '  while(!q.isEmpty()){ Node n=q.poll(); for(Node m:n.neighbors) if(!seen.containsKey(m.val)){ seen.put(m.val,m); q.add(m); } }\n' +
+    '  StringBuilder b=new StringBuilder("["); boolean f1=true; for(Node n:seen.values()){ if(!f1) b.append(","); f1=false; java.util.List<Integer> vs=new java.util.ArrayList<>(); for(Node m:n.neighbors) vs.add(m.val); java.util.Collections.sort(vs);\n' +
+    '    b.append("["); for(int i=0;i<vs.size();i++){ if(i>0) b.append(","); b.append(vs.get(i)); } b.append("]"); } b.append("]"); return b.toString(); }\n\n',
+}
+
 // --- program builders -----------------------------------------------------------
 
 /** Per-language type definitions + (de)serializers injected ahead of the driver.
@@ -341,6 +384,9 @@ function preludeFor(language: string, h: ProblemHarness, userCode: string): stri
   }
   if (usesKind(h, 'tree-node') && !/\b(class|struct)\s+TreeNode\b/.test(userCode)) {
     out += TREE_PRELUDE[language] ?? ''
+  }
+  if (usesKind(h, 'graph-node') && !/\b(class|struct)\s+Node\b/.test(userCode)) {
+    out += GRAPH_PRELUDE[language] ?? ''
   }
   return out
 }

@@ -152,3 +152,28 @@ describe('tree-node codegen', () => {
     expect(outputMatches(evalJs(p), [1, 3, 2])).toBe(true)
   })
 })
+
+const cloneGraph: ProblemHarness = {
+  entry: 'cloneGraph',
+  params: [{ name: 'node', type: 'graph-node<int>' }],
+  returns: 'graph-node<int>',
+  tests: [{ input: [[[2, 4], [1, 3], [2, 4], [1, 3]]], expected: [[2, 4], [1, 3], [2, 4], [1, 3]] }],
+}
+
+describe('graph-node codegen', () => {
+  it('JS builds the adjacency graph and serializes back', () => {
+    const p = buildProgram('javascript', 'function cloneGraph(n){return n}', cloneGraph, [[[2, 4], [1, 3], [2, 4], [1, 3]]])
+    expect(p).toContain('function Node')
+    expect(p).toContain('__toGraph([[2,4],[1,3],[2,4],[1,3]])')
+    expect(p).toContain('__fromGraph(')
+  })
+  it('JS clone-graph round-trips via identity (eval smoke)', () => {
+    const p = buildProgram('javascript', 'function cloneGraph(n){return n}', cloneGraph, [[[2, 4], [1, 3], [2, 4], [1, 3]]])
+    expect(outputMatches(evalJs(p), [[2, 4], [1, 3], [2, 4], [1, 3]])).toBe(true)
+  })
+  it('C++/Java/Python inject Node', () => {
+    expect(buildProgram('python', 'class Solution:\n    def cloneGraph(self,n):\n        return n', cloneGraph, [[[2, 4]]])).toContain('class Node')
+    expect(buildProgram('cpp', 'class Solution{public: Node* cloneGraph(Node* n){return n;}};', cloneGraph, [[[2, 4]]])).toContain('struct Node')
+    expect(buildProgram('java', 'class Solution{ Node cloneGraph(Node n){return n;}}', cloneGraph, [[[2, 4]]])).toContain('static class Node')
+  })
+})
