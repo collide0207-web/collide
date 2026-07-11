@@ -139,6 +139,12 @@ export interface ProblemHarness {
   params: HarnessParam[]
   returns: string
   tests: HarnessTest[]
+  /** Checker spec: 'exact' | 'unordered' | 'float:<eps>' | 'custom:<id>'. Absent → 'exact'. */
+  judge?: string
+  /** Per-case wall-clock limit (ms) used by server-side Submit (SP4). */
+  timeLimitMs?: number
+  /** Per-case memory cap (KB) used by server-side Submit (SP4). */
+  memoryLimitKb?: number
 }
 
 export interface ProblemDetail {
