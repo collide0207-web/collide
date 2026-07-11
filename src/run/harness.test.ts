@@ -208,3 +208,36 @@ describe('array<list-node> codegen', () => {
     expect(outputMatches(evalJs(p), [1, 1, 2, 3, 4, 4, 5, 6])).toBe(true)
   })
 })
+
+const minStack: ProblemHarness = {
+  entry: 'minStackOps',
+  params: [{ name: 'operations', type: 'operations' }],
+  returns: 'operations',
+  tests: [{
+    input: [[['MinStack', []], ['push', [-2]], ['push', [0]], ['getMin', []], ['pop', []], ['top', []]]],
+    expected: [null, null, null, -2, null, -2],
+  }],
+}
+const MIN_STACK_JS = 'class MinStack{constructor(){this.s=[]}push(x){this.s.push(x)}pop(){this.s.pop()}top(){return this.s[this.s.length-1]}getMin(){return Math.min(...this.s)}}'
+const MIN_STACK_PY = 'class MinStack:\n    def __init__(self):\n        self.s=[]\n    def push(self,x):\n        self.s.append(x)\n    def pop(self):\n        self.s.pop()\n    def top(self):\n        return self.s[-1]\n    def getMin(self):\n        return min(self.s)'
+
+describe('operations-mode codegen', () => {
+  it('JS instantiates the class and dispatches, collecting returns', () => {
+    const p = buildProgram('javascript', MIN_STACK_JS, minStack, [minStack.tests[0].input[0]])
+    expect(p).toContain('new MinStack(')
+    expect(p).toContain('JSON.stringify')
+  })
+  it('JS operations round-trip (eval smoke)', () => {
+    const p = buildProgram('javascript', MIN_STACK_JS, minStack, [minStack.tests[0].input[0]])
+    expect(outputMatches(evalJs(p), [null, null, null, -2, null, -2])).toBe(true)
+  })
+  it('Python dispatches by method name', () => {
+    const p = buildProgram('python', MIN_STACK_PY, minStack, [minStack.tests[0].input[0]])
+    expect(p).toContain('MinStack(')
+    expect(p).toContain('json.dumps')
+  })
+  it('C++/Java operations are deferred to SP4 (null program)', () => {
+    expect(buildProgram('cpp', 'class MinStack{};', minStack, [minStack.tests[0].input[0]])).toBeNull()
+    expect(buildProgram('java', 'class MinStack{}', minStack, [minStack.tests[0].input[0]])).toBeNull()
+  })
+})

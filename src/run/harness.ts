@@ -415,12 +415,61 @@ function preludeFor(language: string, h: ProblemHarness, userCode: string): stri
  * calls `entry` with `args` (in param order) and prints the result as canonical JSON.
  * Returns null if the language isn't supported by the codegen yet.
  */
+/** One design-problem op: `[methodName, [args...]]`. The first op is the constructor. */
+type Op = [string, unknown[]]
+type OpsSeq = Op[]
+
+function pyVal(v: unknown): string {
+  if (v === true) return 'True'
+  if (v === false) return 'False'
+  if (v === null) return 'None'
+  return JSON.stringify(v)
+}
+
+/**
+ * Driver for `operations` (design) problems: instantiate the class named by the first op,
+ * dispatch each subsequent op as a method call, and print the collected returns (constructor
+ * slot = null) as canonical JSON. Only JS/Python execute in this environment; compiled-language
+ * dispatch (void-vs-value detection) is owned by the SP4 server judge, so cpp/java return null.
+ */
+function buildOperationsProgram(language: string, userCode: string, ops: OpsSeq): string | null {
+  const [ctor, ...calls] = ops
+  const ctorName = ctor[0]
+  switch (language) {
+    case 'javascript': {
+      const lines = [
+        `const __obj = new ${ctorName}(${(ctor[1] ?? []).map((v) => JSON.stringify(v)).join(', ')});`,
+        `const __res = [null];`,
+        ...calls.map((op) => `__res.push((()=>{ const __r = __obj[${JSON.stringify(op[0])}](${(op[1] ?? []).map((v) => JSON.stringify(v)).join(', ')}); return __r===undefined?null:__r; })());`),
+        `console.log(JSON.stringify(__res));`,
+      ]
+      return `${userCode}\n\n;(function(){\n${lines.join('\n')}\n})();\n`
+    }
+    case 'python': {
+      const lines = [
+        `__obj = ${ctorName}(${(ctor[1] ?? []).map(pyVal).join(', ')})`,
+        `__res = [None]`,
+        ...calls.map((op) => `__res.append(__obj.${op[0]}(${(op[1] ?? []).map(pyVal).join(', ')}))`),
+        `import json`,
+        `print(json.dumps(__res, separators=(',', ':')))`,
+      ]
+      return `${userCode}\n\n${lines.join('\n')}\n`
+    }
+    default:
+      return null // operations dispatch for compiled languages lands with the SP4 server judge
+  }
+}
+
 export function buildProgram(
   language: string,
   userCode: string,
   h: ProblemHarness,
   args: unknown[],
 ): string | null {
+  if (h.params.length === 1 && parseType(h.params[0].type).kind === 'operations') {
+    return buildOperationsProgram(language, userCode, args[0] as OpsSeq)
+  }
+
   const retTag = parseType(h.returns)
 
   switch (language) {
