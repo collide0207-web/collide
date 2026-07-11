@@ -7,7 +7,9 @@ import { BottomPanel } from '../run/BottomPanel'
 import { TestCasePanel } from './TestCasePanel'
 import { runCode, type RunHandle, type RunUpdate } from '../run/runner'
 import { buildProgram, canonical, formatSignature, hasHarness, outputMatches, type CaseResult } from '../run/harness'
-import type { ExecutionStatus, ProblemDetail, UserProgress } from '../api/types'
+import { submitAndWait, type SubmitHandle } from '../run/submissionRunner'
+import { VerdictPanel } from '../run/VerdictPanel'
+import type { ExecutionStatus, ProblemDetail, SubmissionResult, UserProgress } from '../api/types'
 
 const LANG_LABEL: Record<string, string> = {
   javascript: 'JavaScript', python: 'Python', java: 'Java', cpp: 'C++',
@@ -45,6 +47,11 @@ export function ProblemDetailPage() {
   const [caseResults, setCaseResults] = useState<CaseResult[]>([])
   const [activeCase, setActiveCase] = useState(0)
   const [customArgs, setCustomArgs] = useState<string[]>([])
+
+  // Submit (server-side judging) state: PENDING → terminal verdict.
+  const [submitting, setSubmitting] = useState(false)
+  const [verdict, setVerdict] = useState<SubmissionResult | null>(null)
+  const submitHandleRef = useRef<SubmitHandle | null>(null)
 
   const harness = problem && hasHarness(problem.harness) ? problem.harness : null
 
@@ -95,7 +102,7 @@ export function ProblemDetailPage() {
     return () => { live = false }
   }, [slug])
 
-  const save = useCallback((extra: { bumpRun?: boolean; completed?: boolean } = {}) => {
+  const save = useCallback((extra: { bumpRun?: boolean; bumpAttempt?: boolean; completed?: boolean } = {}) => {
     if (!problem) return
     api.updateProgress(problem.id, {
       language: langRef.current,
@@ -114,6 +121,7 @@ export function ProblemDetailPage() {
       window.removeEventListener('beforeunload', flush)
       if (saveTimer.current) { clearTimeout(saveTimer.current); save() }
       runHandleRef.current?.cancel()
+      submitHandleRef.current?.cancel()
     }
   }, [save])
 
@@ -151,9 +159,30 @@ export function ProblemDetailPage() {
     save({ bumpRun: true })
   }
 
+  // Submit sends the solution to the server-side judge (~100 hidden cases) — distinct from Run,
+  // which checks the visible sample cases client-side. Accepted marks the problem solved.
   function onSubmit() {
-    if (!problem || running || !harness) return
-    void runHarness(true)
+    if (!problem || submitting) return
+    setSubmitting(true)
+    setVerdict({
+      submissionId: '', problemSlug: problem.slug, language: langRef.current,
+      status: 'PENDING', passed: 0, total: 0, failingCaseIndex: -1, runtimeMs: 0, createdAt: '',
+    })
+    setOutputCollapsed(false)
+    submitHandleRef.current = submitAndWait(
+      problem.slug,
+      { language: langRef.current, sourceCode: codeRef.current[langRef.current] ?? '' },
+      (r) => {
+        setVerdict(r)
+        if (r.status !== 'PENDING') {
+          setSubmitting(false)
+          if (r.status === 'AC') {
+            api.updateProgress(problem.id, { status: 'solved', completed: true }).then(setProgress).catch(() => {})
+          }
+        }
+      },
+    )
+    save({ bumpAttempt: true })
   }
 
   // Runs one composed program to completion, resolving with the terminal update.
@@ -335,10 +364,10 @@ export function ProblemDetailPage() {
         <button
           className="btn-ghost"
           onClick={onSubmit}
-          disabled={running || !harness}
-          title={harness ? 'Submit — run all example cases' : 'Submit — available once this problem has a test harness'}
+          disabled={submitting || running || !harness}
+          title={harness ? 'Submit — judge against the hidden test suite' : 'Submit — available once this problem has a test harness'}
         >
-          Submit
+          {submitting ? 'Submitting…' : 'Submit'}
         </button>
         {running && <button className="btn-ghost" onClick={onStop} title="Stop">■ Stop</button>}
         <button className="run-btn" onClick={onRun} disabled={running} title="Run (Ctrl+Enter)">
@@ -371,6 +400,8 @@ export function ProblemDetailPage() {
           }}
         />
       </div>
+
+      <VerdictPanel result={verdict} />
 
       {harness ? (
         <TestCasePanel

@@ -9,6 +9,7 @@ import type {
   Room,
   ShareLink,
   SignupInput,
+  SubmissionResult, SubmissionSummary, SubmitInput,
   User, UserProgress,
 } from './types'
 import { MOCK_PROBLEMS } from '../problems/seed'
@@ -51,6 +52,10 @@ function save(s: Store) {
 
 let id = 0
 const nextId = (p: string) => `${p}_${Date.now().toString(36)}_${id++}`
+
+// Submit-tier mock state (SP4). UI-only; real judging is server-side.
+const mockSubmissions = new Map<string, SubmissionResult>()
+const mockSubmissionsBySlug = new Map<string, SubmissionResult[]>()
 
 // --- code execution (mock) ---------------------------------------------------
 // No backend, so only JavaScript can actually run — evaluated right in the browser.
@@ -304,6 +309,36 @@ export const mockApi: Api = {
   async cancelExecution(_executionId) {
     // Mock executions run synchronously and are already finished by the time execute()
     // returns, so there's nothing in-flight to cancel.
+  },
+
+  // --- server-side judging (Submit) — UI-only mock: any non-empty source is "Accepted" ---
+  async submitSolution(slug, input): Promise<SubmissionSummary> {
+    const submissionId = nextId('sub')
+    const accepted = !!input.sourceCode && input.sourceCode.trim().length > 0
+    const result: SubmissionResult = {
+      submissionId,
+      problemSlug: slug,
+      language: input.language,
+      status: accepted ? 'AC' : 'WA',
+      passed: accepted ? 100 : 0,
+      total: 100,
+      failingCaseIndex: accepted ? -1 : 0,
+      runtimeMs: 12,
+      createdAt: new Date().toISOString(),
+    }
+    mockSubmissions.set(submissionId, result)
+    mockSubmissionsBySlug.set(slug, [result, ...(mockSubmissionsBySlug.get(slug) ?? [])])
+    return { submissionId, status: 'PENDING' }
+  },
+
+  async getSubmission(submissionId): Promise<SubmissionResult> {
+    const r = mockSubmissions.get(submissionId)
+    if (!r) throw new Error('no such submission')
+    return r
+  },
+
+  async getSubmissions(slug): Promise<SubmissionResult[]> {
+    return mockSubmissionsBySlug.get(slug) ?? []
   },
 
   // --- problems & progress (served from the embedded mirror) ---
