@@ -60,6 +60,13 @@ export function ModeSelect() {
             <p>Grind the NeetCode 150. Browse by topic, solve in the editor, and track your progress.</p>
             <span className="mode-cta">Open dashboard →</span>
           </button>
+
+          <button className="mode-card docs" onClick={() => navigate('/workspace')}>
+            <div className="mode-icon">📄</div>
+            <h3>Document workspace</h3>
+            <p>Open a PDF, image or slide deck beside the drawing canvas — review and annotate side by side.</p>
+            <span className="mode-cta">Open workspace →</span>
+          </button>
         </div>
       </div>
     </div>

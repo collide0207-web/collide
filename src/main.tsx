@@ -8,6 +8,7 @@ import { RoomPage } from './rooms/RoomPage'
 import { ProblemsPage } from './problems/ProblemsPage'
 import { ProblemDetailPage } from './problems/ProblemDetailPage'
 import { DashboardPage } from './problems/DashboardPage'
+import { WorkspacePage } from './workspace/WorkspacePage'
 import './index.css'
 
 const router = createBrowserRouter([
@@ -19,6 +20,7 @@ const router = createBrowserRouter([
   { path: '/problems', element: <ProblemsPage /> },
   { path: '/problems/:slug', element: <ProblemDetailPage /> },
   { path: '/room/:roomId', element: <RoomPage /> },
+  { path: '/workspace', element: <WorkspacePage /> },
 ])
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
